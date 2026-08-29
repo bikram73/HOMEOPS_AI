@@ -49,25 +49,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Primary Navigation Links */}
       <nav id="sidebar-menu" className="flex-1 space-y-1.5 overflow-y-auto scrollbar-hide">
-        {/* Landing Page Quick Access */}
-        <button
-          id="nav-link-landing"
-          onClick={() => setActiveTab('landing')}
-          className={`w-full flex items-center justify-between px-4 py-2.5 mb-2 rounded-xl text-xs font-bold transition-all duration-200 text-left border ${
-            activeTab === 'landing'
-              ? 'bg-[#99efe5]/20 text-[#99efe5] border-[#99efe5]/40 shadow-sm'
-              : 'text-[#99efe5] bg-[#99efe5]/10 border-[#99efe5]/20 hover:bg-[#99efe5]/20'
-          }`}
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-[18px]">public</span>
-            <span>Landing Page</span>
-          </div>
-          <span className="text-[10px] bg-[#99efe5] text-[#131b2e] px-1.5 py-0.5 rounded font-black">
-            PRO
-          </span>
-        </button>
-
         {navItems.map((item) => {
           const isActive = activeTab === item.id;
           return (

@@ -1,0 +1,6 @@
+{
+  "name": "HomeOps AI",
+  "description": "Smart household operations and management platform with AI assistance, task scheduling, inventory tracking, and bill management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

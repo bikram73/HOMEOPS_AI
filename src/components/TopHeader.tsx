@@ -174,16 +174,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               >
                 <span className="material-symbols-outlined text-[16px]">settings</span> Settings
               </button>
-              <div className="border-t border-gray-100 my-1"></div>
-              <button
-                onClick={() => {
-                  alert('HomeOps AI is in active demo mode.');
-                  setShowUserMenu(false);
-                }}
-                className="w-full px-4 py-2 text-left text-xs text-red-600 hover:bg-red-50 flex items-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[16px]">logout</span> Switch Home
-              </button>
             </div>
           )}
         </div>

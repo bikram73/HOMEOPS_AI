@@ -81,13 +81,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
           {/* Action CTAs */}
           <div className="flex items-center gap-4">
             <button
-              id="btn-nav-login"
-              onClick={() => onLaunchApp('home')}
-              className="hidden md:block text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
-            >
-              Log In
-            </button>
-            <button
               id="btn-nav-get-started"
               onClick={() => onLaunchApp('home')}
               className="bg-[#006a63] text-white px-4 py-2 rounded-lg text-[14px] font-medium hover:bg-[#00504a] active:scale-95 transition-all shadow-xs"

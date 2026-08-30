@@ -22,6 +22,40 @@ interface LandingPageViewProps {
 export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp }) => {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [activeVideoTab, setActiveVideoTab] = useState<'overview' | 'tasks' | 'inventory' | 'bills'>('overview');
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [statusIndex, setStatusIndex] = useState(0);
+
+  const rotatingPhrases = [
+    'restock pantry essentials',
+    'schedule AC servicing',
+    'pay utility bills on time',
+    'automate chore routines',
+    'track grocery inventory',
+    'orchestrate home repairs',
+  ];
+
+  const liveStatusUpdates = [
+    '⚡ Auto-replenishing pantry par levels',
+    '📄 BESCOM electricity bill scheduled for Auto-Pay',
+    '🔧 AC filter & coil check due in 4 days',
+    '🧹 Deep cleaning routine assigned for Tuesday',
+    '📦 Grocery shopping list synced via Telegram',
+  ];
+
+  React.useEffect(() => {
+    const phraseTimer = setInterval(() => {
+      setPhraseIndex((prev) => (prev + 1) % rotatingPhrases.length);
+    }, 2800);
+
+    const statusTimer = setInterval(() => {
+      setStatusIndex((prev) => (prev + 1) % liveStatusUpdates.length);
+    }, 3600);
+
+    return () => {
+      clearInterval(phraseTimer);
+      clearInterval(statusTimer);
+    };
+  }, []);
 
   const heroImageSrc =
     'https://lh3.googleusercontent.com/aida/AEtjO1VlJX0YISrdfLnSMPxpXKf8T-NsvHWIms3vpdPq4CsxYYOkVqmR5vhYg9GQAIKCvuFxkwECms8MI41ZLLxpTQe2RsTvAH9Isc4p--YeRCNxaWtGjmAqgvXAvjHUcC8_S36wZvLMIQWJH_2M7Bl9TDECr7NGtkjA4-3qc0Rc7KpjKY7T6i7H1DSXNDdSA4fzeK1b8yCYee7vsYE6EjzSdwIibrkAWyumxaJH2sSUl_8llSgxZjsCo4_Fww';
@@ -96,14 +130,78 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
         {/* Hero Section */}
         <section className="px-4 md:px-10 max-w-[1440px] mx-auto mt-10 md:mt-12 mb-20 md:mb-24 text-center">
           <div className="max-w-4xl mx-auto flex flex-col items-center">
-            <h1 className="text-[36px] sm:text-[44px] md:text-[48px] font-bold text-[#000000] tracking-[-0.02em] leading-[1.15] mb-5">
-              Don't manage your home.
+            {/* Live Operational Status Animated Pill */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-50 border border-teal-200/80 text-[#006a63] text-xs font-semibold mb-6 shadow-xs"
+            >
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#006a63] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#006a63]"></span>
+              </span>
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={statusIndex}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.3 }}
+                  className="tracking-tight font-medium"
+                >
+                  {liveStatusUpdates[statusIndex]}
+                </motion.span>
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Dynamic Animated Headline */}
+            <h1 className="text-[36px] sm:text-[44px] md:text-[50px] font-bold text-[#000000] tracking-[-0.025em] leading-[1.18] mb-5">
+              <span>Don't manage your home.</span>
               <br />
-              Tell HomeOps what matters.
+              <span className="inline-flex flex-wrap items-baseline justify-center gap-x-2">
+                <span>Tell HomeOps to</span>
+                <span className="inline-block relative overflow-hidden align-bottom min-w-[240px] sm:min-w-[340px] text-left">
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={phraseIndex}
+                      initial={{ y: 35, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -35, opacity: 0 }}
+                      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                      className="inline-block text-[#006a63] font-extrabold underline decoration-[#99efe5] decoration-4 underline-offset-4"
+                    >
+                      {rotatingPhrases[phraseIndex]}.
+                    </motion.span>
+                  </AnimatePresence>
+                </span>
+              </span>
             </h1>
-            <p className="text-[17px] sm:text-[18px] text-[#45464d] font-normal leading-[1.55] mb-9 max-w-2xl">
-              The intelligent household operations agent that handles tasks, inventory, and bills so you don't have to.
-            </p>
+
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="text-[17px] sm:text-[18px] text-[#45464d] font-normal leading-[1.55] mb-5 max-w-2xl"
+            >
+              The intelligent household operations agent that orchestrates chores, restocks groceries, schedules repairs, and reconciles utility bills across Telegram, Slack, and web.
+            </motion.p>
+
+            {/* Interactive Prompt Chips */}
+            <div className="flex flex-wrap items-center justify-center gap-2 mb-8 max-w-2xl">
+              <span className="text-xs text-gray-500 font-medium mr-1 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#006a63]" /> Try asking:
+              </span>
+              {["\"We're low on olive oil\"", "\"When is electricity bill due?\"", "\"Schedule AC filter check\""].map((prompt, pIdx) => (
+                <button
+                  key={pIdx}
+                  onClick={() => onLaunchApp('assistant')}
+                  className="text-xs bg-white hover:bg-teal-50 text-slate-700 hover:text-[#006a63] px-3 py-1.5 rounded-full border border-gray-200/80 hover:border-teal-300 transition-all shadow-xs cursor-pointer active:scale-95"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
 
             {/* CTAs */}
             <div className="flex flex-col sm:flex-row gap-4 mb-14 sm:mb-16 w-full sm:w-auto justify-center">

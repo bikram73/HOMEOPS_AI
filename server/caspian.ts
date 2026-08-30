@@ -197,7 +197,8 @@ class CaspianIntegrationService {
     // Process directly through Gemini Agent with deterministic Tools
     const agentResult = await processUserMessage(messageText);
 
-    // If live Caspian client instance exists, forward response
+    // Outbound response handling:
+    // 1. Direct Caspian SDK client if initialized
     if (this.caspianClient && typeof this.caspianClient.send === 'function') {
       try {
         await this.caspianClient.send({
@@ -207,6 +208,24 @@ class CaspianIntegrationService {
         });
       } catch (e) {
         console.error('[Caspian send error]', e);
+      }
+    }
+
+    // 2. Direct Telegram Bot API fallback if raw Telegram sender and token exists
+    const botToken = this.getBotToken();
+    if (channel.toLowerCase() === 'telegram' && botToken && senderId && senderId !== 'user_telegram') {
+      try {
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: senderId,
+            text: agentResult.response,
+            parse_mode: 'Markdown',
+          }),
+        });
+      } catch (tgErr) {
+        console.error('[Telegram Outbound Send Error]', (tgErr as Error).message);
       }
     }
 

@@ -472,8 +472,60 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     };
   }
 
-  // 9. Show/list queries: "Show my tasks" / "What's pending?" / "Show shopping list"
-  if (msg.includes('show') || msg.includes('what is') || msg.includes("what's") || msg.includes('list')) {
+  // 9. Show/list queries & specific item queries (Anti-Hallucination)
+  if (
+    msg.includes('how many') ||
+    msg.includes('how much') ||
+    msg.includes('do i have') ||
+    msg.includes('is there any') ||
+    msg.includes('did you pay') ||
+    msg.includes('is the bill paid') ||
+    msg.includes('show') ||
+    msg.includes('what is') ||
+    msg.includes("what's") ||
+    msg.includes('list')
+  ) {
+    const currentState = stateManager.getState();
+
+    // Specific item quantity check: "How many bananas do I have?", "How much detergent?"
+    if (msg.includes('how many') || msg.includes('how much') || msg.includes('do i have')) {
+      const match = msg.match(/(?:how many|how much|do i have|count of)\s+([a-zA-Z\s]+?)(?:\s+do i have|\s+left|\s+in inventory|\?|$)/i);
+      const queryItem = match && match[1] ? match[1].replace(/do i have|left|in inventory|\?/gi, '').trim().toLowerCase() : '';
+      
+      if (queryItem) {
+        const found = currentState.inventory.find(i => i.name.toLowerCase().includes(queryItem));
+        if (found) {
+          return {
+            response: `You have **${found.name}** at **${found.quantity}%** stock (${found.unit || 'units'}), currently **${found.status.toUpperCase()}** in ${found.location}.`,
+            toolsExecuted: [{ toolName: 'listInventory', args: {}, result: { success: true, message: 'Queried inventory', data: found } }],
+          };
+        } else {
+          return {
+            response: `I don't have "${queryItem}" recorded in your current household inventory. You can add it anytime by saying "Add ${queryItem} to inventory" or "We have 5 ${queryItem}".`,
+            toolsExecuted: [{ toolName: 'listInventory', args: {}, result: { success: true, message: 'Item not found in inventory', data: null } }],
+          };
+        }
+      }
+    }
+
+    // Bill payment status check: "Did you pay my electricity bill?", "Is electricity bill paid?"
+    if (msg.includes('did you pay') || msg.includes('bill paid') || msg.includes('is the electricity bill paid')) {
+      const electricityBill = currentState.bills.find(b => b.name.toLowerCase().includes('electricity') || b.name.toLowerCase().includes('power'));
+      if (electricityBill) {
+        if (electricityBill.paid) {
+          return {
+            response: `Yes, your **${electricityBill.name}** ($${electricityBill.amount}) has been marked as **PAID**.`,
+            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: electricityBill } }],
+          };
+        } else {
+          return {
+            response: `No, your **${electricityBill.name}** ($${electricityBill.amount}) is **UNPAID** and currently due **${electricityBill.dueDate}**. Would you like me to mark it as paid now?`,
+            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: electricityBill } }],
+          };
+        }
+      }
+    }
+
     if (msg.includes('task') || msg.includes('pending')) {
       const res = tools.listTasks({ filter: 'pending' });
       toolsExecuted.push({ toolName: 'listTasks', args: { filter: 'pending' }, result: res });

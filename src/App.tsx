@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, ChatMessage } from './types';
 import {
   INITIAL_TASKS,
@@ -8,6 +8,7 @@ import {
   INITIAL_CHAT,
   INITIAL_ACTIVITIES,
 } from './data/mockData';
+import { api } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { DashboardView } from './components/DashboardView';
@@ -20,6 +21,11 @@ import { MobileDashboardView } from './components/MobileDashboardView';
 import { LandingPageView } from './components/LandingPageView';
 import { SettingsModal, HelpModal } from './components/SettingsModal';
 import { NotificationsDrawer } from './components/NotificationsDrawer';
+import { WhatShouldIDoNowModal } from './components/WhatShouldIDoNowModal';
+import { BriefingModal } from './components/BriefingModal';
+import { WeeklyPlanModal } from './components/WeeklyPlanModal';
+import { CaspianDemoModal } from './components/CaspianDemoModal';
+import { AnalyticsModal } from './components/AnalyticsModal';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<PageTab>('landing');
@@ -31,44 +37,181 @@ export function App() {
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(INITIAL_SHOPPING);
   const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(INITIAL_CHAT);
-  const [activities] = useState(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
 
-  // UI state
+  // UI modal states
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isWhatNowOpen, setIsWhatNowOpen] = useState(false);
+  const [isBriefingOpen, setIsBriefingOpen] = useState(false);
+  const [isWeeklyPlanOpen, setIsWeeklyPlanOpen] = useState(false);
+  const [isCaspianOpen, setIsCaspianOpen] = useState(false);
+  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+
+  // Sync state from server on mount and after actions
+  const syncServerState = useCallback(async () => {
+    try {
+      const liveState = await api.getState();
+      if (liveState) {
+        if (liveState.tasks) {
+          setTasks(
+            liveState.tasks.map((t) => ({
+              id: t.id,
+              title: t.title,
+              subtitle: `${t.category} • ${t.dueDate}`,
+              priority: (t.priority.charAt(0).toUpperCase() + t.priority.slice(1)) as any,
+              category: t.category,
+              dueDate: t.dueDate,
+              amount: t.amount,
+              provider: t.provider,
+              completed: t.completed,
+            }))
+          );
+        }
+        if (liveState.inventory) {
+          setInventory(
+            liveState.inventory.map((i) => {
+              const avail =
+                i.status === 'critical'
+                  ? 5
+                  : i.status === 'low'
+                  ? 20
+                  : i.quantity > 5
+                  ? 80
+                  : 45;
+              return {
+                id: i.id,
+                name: i.name,
+                category: i.category,
+                location: 'Pantry / Storage',
+                availability: avail,
+                badge: i.status === 'critical' || i.status === 'low' ? 'Low' : 'Normal',
+                icon: i.category.toLowerCase().includes('clean') ? 'cleaning_services' : 'local_dining',
+                unit: i.unit,
+                currentLevelDetail: `${avail}% ${avail <= 30 ? '(Low)' : '(Adequate)'}`,
+                avgUsage: 'Regular weekly use',
+              };
+            })
+          );
+        }
+        if (liveState.shopping) {
+          setShoppingItems(
+            liveState.shopping.map((s) => ({
+              id: s.id,
+              name: s.name,
+              category: s.category || 'General',
+              quantity: s.quantity || '1',
+              checked: s.completed,
+            }))
+          );
+        }
+        if (liveState.bills) {
+          setBills(
+            liveState.bills.map((b) => ({
+              id: b.id,
+              name: b.name,
+              amount: `₹${b.amount.toLocaleString()}`,
+              dueDate: b.dueDate,
+              dueCategory: b.paid ? 'Paid' : 'Due Tomorrow',
+              icon: 'flash_on',
+              paidThisMonth: b.paid,
+            }))
+          );
+        }
+        if (liveState.activities) {
+          setActivities(
+            liveState.activities.map((a) => ({
+              id: a.id,
+              title: a.title,
+              subtitle: a.subtitle,
+              timeAgo: a.timeAgo,
+              icon: a.icon || 'history',
+            }))
+          );
+        }
+      }
+    } catch {
+      // Ephemeral fallback: use client state if offline
+    }
+  }, []);
+
+  useEffect(() => {
+    syncServerState();
+  }, [syncServerState]);
 
   // Handlers for Tasks
-  const handleToggleTask = (id: string) => {
+  const handleToggleTask = async (id: string) => {
+    const target = tasks.find((t) => t.id === id);
+    const newStatus = !target?.completed;
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
+      prev.map((t) => (t.id === id ? { ...t, completed: newStatus } : t))
     );
+    try {
+      await api.toggleTask(id, newStatus);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleAddTask = (newTask: Omit<TaskItem, 'id'>) => {
+  const handleAddTask = async (newTask: Omit<TaskItem, 'id'>) => {
+    const localId = `task-${Date.now()}`;
     const item: TaskItem = {
       ...newTask,
-      id: `task-${Date.now()}`,
+      id: localId,
     };
     setTasks((prev) => [item, ...prev]);
+    try {
+      await api.createTask({
+        title: newTask.title,
+        category: newTask.category as any,
+        priority: newTask.priority.toLowerCase() as any,
+        dueDate: newTask.dueDate,
+        amount: newTask.amount,
+        provider: newTask.provider,
+      });
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleDeleteTask = (id: string) => {
+  const handleDeleteTask = async (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    try {
+      await api.deleteTask(id);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Handlers for Inventory
-  const handleAddInventoryItem = (newItem: Omit<InventoryItem, 'id'>) => {
+  const handleAddInventoryItem = async (newItem: Omit<InventoryItem, 'id'>) => {
+    const localId = `inv-${Date.now()}`;
     const item: InventoryItem = {
       ...newItem,
-      id: `inv-${Date.now()}`,
+      id: localId,
     };
     setInventory((prev) => [item, ...prev]);
+    try {
+      await api.addInventoryItem({
+        name: newItem.name,
+        quantity: newItem.availability > 30 ? 5 : 1,
+        unit: newItem.unit || 'units',
+        status: newItem.availability <= 30 ? 'low' : 'good',
+        category: newItem.category,
+      });
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleUpdateAvailability = (id: string, delta: number) => {
+  const handleUpdateAvailability = async (id: string, delta: number) => {
     setInventory((prev) =>
       prev.map((item) => {
         if (item.id === id) {
@@ -83,20 +226,48 @@ export function App() {
         return item;
       })
     );
+    try {
+      const item = inventory.find((i) => i.id === id);
+      if (item) {
+        const newLevel = Math.max(0, Math.min(100, item.availability + delta));
+        await api.updateInventoryQuantity(
+          id,
+          Math.ceil(newLevel / 20),
+          newLevel <= 10 ? 'critical' : newLevel <= 30 ? 'low' : 'good'
+        );
+        syncServerState();
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // Handlers for Shopping
-  const handleToggleShopping = (id: string) => {
+  const handleToggleShopping = async (id: string) => {
+    const item = shoppingItems.find((s) => s.id === id);
+    const newStatus = !item?.checked;
     setShoppingItems((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, checked: !s.checked } : s))
+      prev.map((s) => (s.id === id ? { ...s, checked: newStatus } : s))
     );
+    try {
+      await api.toggleShoppingItem(id, newStatus);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleDeleteShopping = (id: string) => {
+  const handleDeleteShopping = async (id: string) => {
     setShoppingItems((prev) => prev.filter((s) => s.id !== id));
+    try {
+      await api.deleteShoppingItem(id);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleAddShoppingItem = (name: string, category: string) => {
+  const handleAddShoppingItem = async (name: string, category: string) => {
     const exists = shoppingItems.find((s) => s.name.toLowerCase() === name.toLowerCase());
     if (exists) return;
 
@@ -110,17 +281,23 @@ export function App() {
         checked: false,
       },
     ]);
+    try {
+      await api.addShoppingItem(name, '1', category);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleAddAllLowToShopping = () => {
+  const handleAddAllLowToShopping = async () => {
     const lowItems = inventory.filter((i) => i.availability <= 30);
-    lowItems.forEach((item) => {
-      handleAddShoppingItem(item.name, `${item.category} • Refill`);
-    });
+    for (const item of lowItems) {
+      await handleAddShoppingItem(item.name, `${item.category} • Refill`);
+    }
   };
 
   // Handlers for Bills
-  const handlePayBill = (billId: string) => {
+  const handlePayBill = async (billId: string) => {
     setBills((prev) =>
       prev.map((b) =>
         b.id === billId
@@ -139,10 +316,16 @@ export function App() {
         t.title.toLowerCase().includes('electricity') ? { ...t, completed: true } : t
       )
     );
+    try {
+      await api.payBill(billId);
+      syncServerState();
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   // AI Chat Handler
-  const handleSendChatMessage = (text: string) => {
+  const handleSendChatMessage = async (text: string) => {
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
       sender: 'user',
@@ -152,42 +335,38 @@ export function App() {
 
     setChatHistory((prev) => [...prev, userMsg]);
 
-    // Intelligent context response matching HomeOps AI tone
-    setTimeout(() => {
-      let replyText = "I've reviewed your household telemetry. Everything is running smoothly.";
-      const lower = text.toLowerCase();
-
-      if (lower.includes('detergent') || lower.includes('low') || lower.includes('stock')) {
-        replyText =
-          "I've updated your inventory records and placed refill requests on your Shopping list.";
-        handleAddShoppingItem('Laundry Detergent', 'Cleaning • Liquid, 2L');
-      } else if (lower.includes('urgent') || lower.includes('today') || lower.includes('what should i do')) {
-        replyText =
-          "Your top urgent priority is paying the Electricity bill (₹1,850) due tomorrow, followed by completing the pending HVAC check.";
-      } else if (lower.includes('bill') || lower.includes('electricity') || lower.includes('pay')) {
-        replyText =
-          "The City Electricity bill is due tomorrow for ₹1,850. Would you like me to guide you to the Bills panel to pay it now?";
-      } else if (lower.includes('shopping') || lower.includes('list') || lower.includes('buy')) {
-        replyText = `You currently have ${
-          shoppingItems.filter((i) => !i.checked).length
-        } items on your shopping list, including Basmati Rice and Toothpaste.`;
-      } else if (lower.includes('maintenance') || lower.includes('hvac') || lower.includes('filter')) {
-        replyText =
-          'Your HVAC filter is due for replacement within the next 3 days. I can schedule a technician or set a reminder.';
-      }
-
+    try {
+      const res = await api.sendAgentMessage(text);
       const assistantMsg: ChatMessage = {
         id: `msg-${Date.now() + 1}`,
         sender: 'assistant',
-        text: replyText,
+        text: res.response,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        priorities: res.priorities?.map((p: any) => ({
+          id: p.id,
+          type: p.type || 'High Priority',
+          title: p.title,
+          desc: p.desc,
+          icon: p.icon || 'assignment_late',
+          colorType: p.colorType || 'error',
+        })),
       };
-
       setChatHistory((prev) => [...prev, assistantMsg]);
-    }, 700);
+      syncServerState();
+    } catch {
+      // Fallback
+      setTimeout(() => {
+        const assistantMsg: ChatMessage = {
+          id: `msg-${Date.now() + 1}`,
+          sender: 'assistant',
+          text: `Processed: "${text}". Household records have been synchronized.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+        setChatHistory((prev) => [...prev, assistantMsg]);
+      }, 500);
+    }
   };
 
-  // Filter tasks or items if search query is active
   const pendingTasksCount = tasks.filter((t) => !t.completed).length;
 
   return (
@@ -254,6 +433,7 @@ export function App() {
                 chatHistory={chatHistory}
                 onSendMessage={handleSendChatMessage}
                 setActiveTab={setActiveTab}
+                onRefreshState={syncServerState}
               />
             )}
             {activeTab === 'maintenance' && <MaintenanceView />}
@@ -301,6 +481,10 @@ export function App() {
                   setActiveTab={setActiveTab}
                   onAddAllLowToShopping={handleAddAllLowToShopping}
                   onSelectTask={(t) => setSelectedTask(t)}
+                  onOpenWhatNowModal={() => setIsWhatNowOpen(true)}
+                  onOpenBriefingModal={() => setIsBriefingOpen(true)}
+                  onOpenWeeklyPlanModal={() => setIsWeeklyPlanOpen(true)}
+                  onOpenCaspianModal={() => setIsCaspianOpen(true)}
                 />
               )}
 
@@ -340,6 +524,7 @@ export function App() {
                   chatHistory={chatHistory}
                   onSendMessage={handleSendChatMessage}
                   setActiveTab={setActiveTab}
+                  onRefreshState={syncServerState}
                 />
               )}
 
@@ -354,6 +539,46 @@ export function App() {
 
       {/* Help & Guide Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
+      {/* What Should I Do Now Signature Modal */}
+      <WhatShouldIDoNowModal
+        isOpen={isWhatNowOpen}
+        onClose={() => setIsWhatNowOpen(false)}
+        onNavigate={(tab) => {
+          setIsWhatNowOpen(false);
+          setActiveTab(tab);
+        }}
+        onRefreshState={syncServerState}
+      />
+
+      {/* Daily Home Briefing Modal */}
+      <BriefingModal
+        isOpen={isBriefingOpen}
+        onClose={() => setIsBriefingOpen(false)}
+        onNavigate={(tab) => {
+          setIsBriefingOpen(false);
+          setActiveTab(tab);
+        }}
+      />
+
+      {/* Weekly Plan Modal */}
+      <WeeklyPlanModal
+        isOpen={isWeeklyPlanOpen}
+        onClose={() => setIsWeeklyPlanOpen(false)}
+      />
+
+      {/* Caspian Telegram Integration Simulator Modal */}
+      <CaspianDemoModal
+        isOpen={isCaspianOpen}
+        onClose={() => setIsCaspianOpen(false)}
+        onRefreshState={syncServerState}
+      />
+
+      {/* Telemetry Analytics Modal */}
+      <AnalyticsModal
+        isOpen={isAnalyticsOpen}
+        onClose={() => setIsAnalyticsOpen(false)}
+      />
 
       {/* Notifications Drawer */}
       <NotificationsDrawer

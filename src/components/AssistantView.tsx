@@ -1,16 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, PageTab } from '../types';
+import { api } from '../services/api';
+import { Sparkles, Send, Zap, Calendar, Wrench, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface AssistantViewProps {
   chatHistory: ChatMessage[];
   onSendMessage: (text: string) => void;
   setActiveTab: (tab: PageTab) => void;
+  onRefreshState?: () => void;
 }
 
 export const AssistantView: React.FC<AssistantViewProps> = ({
   chatHistory,
   onSendMessage,
   setActiveTab,
+  onRefreshState,
 }) => {
   const [inputText, setInputText] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -24,7 +28,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     scrollToBottom();
   }, [chatHistory, isGenerating]);
 
-  const handleSend = (textToSend?: string) => {
+  const handleSend = async (textToSend?: string) => {
     const query = textToSend || inputText;
     if (!query.trim() || isGenerating) return;
 
@@ -32,9 +36,17 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     setInputText('');
     setIsGenerating(true);
 
-    setTimeout(() => {
+    try {
+      // Call live backend agentic processing
+      const res = await api.sendAgentMessage(query.trim());
+      if (onRefreshState) {
+        onRefreshState();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
       setIsGenerating(false);
-    }, 600);
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
@@ -45,19 +57,27 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full h-full relative bg-white md:bg-transparent overflow-hidden animate-in fade-in duration-200">
       {/* Chat Header */}
       <div className="px-6 py-6 md:py-8 border-b border-[#e2e8f0]/60 bg-white/90 backdrop-blur-xs sticky top-0 z-10">
-        <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] flex items-center gap-3 tracking-tight">
-          <span className="material-symbols-outlined text-[#0F766E] text-3xl md:text-4xl">
-            auto_awesome
-          </span>
-          HomeOps AI
-        </h2>
-        <p className="text-sm md:text-base text-gray-500 mt-1.5 font-medium">
-          Your household operations agent
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] flex items-center gap-3 tracking-tight">
+              <span className="material-symbols-outlined text-[#0F766E] text-3xl md:text-4xl">
+                auto_awesome
+              </span>
+              HomeOps AI
+            </h2>
+            <p className="text-sm md:text-base text-gray-500 mt-1.5 font-medium">
+              Autonomous Household Operations Agent
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Gemini Reasoning + Tools Ready</span>
+          </div>
+        </div>
       </div>
 
       {/* Chat Messages History */}
-      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-6 scrollbar-hide pb-48">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-6 space-y-6 scrollbar-hide pb-52">
         {chatHistory.map((msg) => {
           const isUser = msg.sender === 'user';
 
@@ -84,7 +104,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                 {/* Standard text bubble */}
                 {msg.text && (
                   <div className="bg-[#F0FDFA] border-l-3 border-[#0F766E] text-[#0F172A] px-5 py-4 rounded-2xl rounded-tl-xs shadow-xs">
-                    <p className="text-sm md:text-base text-[#134E4A] leading-relaxed">{msg.text}</p>
+                    <p className="text-sm md:text-base text-[#134E4A] leading-relaxed whitespace-pre-line">
+                      {msg.text}
+                    </p>
                   </div>
                 )}
 
@@ -168,7 +190,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
                 className="w-2 h-2 rounded-full bg-[#0F766E] animate-bounce"
                 style={{ animationDelay: '0.4s' }}
               ></span>
-              <span>HomeOps is analyzing household data...</span>
+              <span>HomeOps AI is reasoning and inspecting household state...</span>
             </div>
           </div>
         )}
@@ -189,6 +211,14 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
             What's urgent?
           </button>
           <button
+            id="chip-what-should-i-do-now"
+            onClick={() => handleQuickPrompt('What should I do right now?')}
+            className="whitespace-nowrap px-3.5 py-1.5 rounded-full border border-[#e2e8f0] bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 hover:text-[#0F172A] hover:border-[#0F766E] transition-all flex items-center gap-1.5 shadow-xs"
+          >
+            <Zap className="w-3.5 h-3.5 text-teal-600" />
+            What should I do now?
+          </button>
+          <button
             id="chip-show-shopping-list"
             onClick={() => handleQuickPrompt('Show shopping list')}
             className="whitespace-nowrap px-3.5 py-1.5 rounded-full border border-[#e2e8f0] bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 hover:text-[#0F172A] hover:border-[#0F766E] transition-all flex items-center gap-1.5 shadow-xs"
@@ -198,13 +228,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           </button>
           <button
             id="chip-weeks-overview"
-            onClick={() => handleQuickPrompt("Show me this week's maintenance overview")}
+            onClick={() => handleQuickPrompt('Generate a weekly household plan')}
             className="whitespace-nowrap px-3.5 py-1.5 rounded-full border border-[#e2e8f0] bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50 hover:text-[#0F172A] hover:border-[#0F766E] transition-all flex items-center gap-1.5 shadow-xs"
           >
-            <span className="material-symbols-outlined text-[15px] text-blue-500">
-              calendar_month
-            </span>
-            Week's overview
+            <Calendar className="w-3.5 h-3.5 text-blue-500" />
+            Plan my week
           </button>
         </div>
 
@@ -221,13 +249,13 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Ask HomeOps anything..."
+            placeholder="Ask HomeOps anything (e.g. 'We are out of detergent', 'Pay electricity bill', 'Prioritize today')..."
             className="w-full bg-white border border-[#e2e8f0] rounded-xl py-3.5 pl-4 pr-14 text-sm md:text-base text-[#0F172A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:border-transparent transition-all shadow-xs"
           />
           <button
             id="btn-ai-send"
             type="submit"
-            disabled={!inputText.trim()}
+            disabled={!inputText.trim() || isGenerating}
             className="absolute right-2.5 p-2 bg-[#006a63] hover:bg-[#00504a] disabled:opacity-40 text-white rounded-lg transition-colors flex items-center justify-center shadow-xs cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">send</span>
@@ -236,7 +264,7 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
 
         <div className="text-center mt-2.5">
           <span className="text-[11px] text-gray-400 font-medium">
-            HomeOps AI can make mistakes. Verify important information.
+            HomeOps AI connects directly to household inventory, tasks, bills, and maintenance state.
           </span>
         </div>
       </div>

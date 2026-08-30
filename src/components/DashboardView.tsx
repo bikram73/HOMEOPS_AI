@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PageTab, TaskItem, InventoryItem } from '../types';
 import { HERO_IMAGE_URL } from '../data/mockData';
+import { Sparkles, Calendar, Zap, MessageSquare } from 'lucide-react';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
@@ -9,6 +10,10 @@ interface DashboardViewProps {
   setActiveTab: (tab: PageTab) => void;
   onAddAllLowToShopping: () => void;
   onSelectTask: (task: TaskItem) => void;
+  onOpenWhatNowModal?: () => void;
+  onOpenBriefingModal?: () => void;
+  onOpenWeeklyPlanModal?: () => void;
+  onOpenCaspianModal?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -18,12 +23,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   setActiveTab,
   onAddAllLowToShopping,
   onSelectTask,
+  onOpenWhatNowModal,
+  onOpenBriefingModal,
+  onOpenWeeklyPlanModal,
+  onOpenCaspianModal,
 }) => {
   const [isAiCardDismissed, setIsAiCardDismissed] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   // Priority tasks filter
-  const priorityTasks = tasks.slice(0, 3);
+  const priorityTasks = tasks.slice(0, 4);
   const pendingCount = tasks.filter((t) => !t.completed).length;
   const lowInventoryItems = inventory.filter((i) => i.availability <= 30);
 
@@ -33,7 +42,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const handleAddAllClick = () => {
     onAddAllLowToShopping();
-    setActionSuccessMsg('Added 3 low stock items to your Shopping List!');
+    setActionSuccessMsg('Added low stock items to your Shopping List!');
     setTimeout(() => setActionSuccessMsg(null), 4000);
   };
 
@@ -53,24 +62,68 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      {/* Page Header with Action Buttons */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] tracking-tight">
-            Good morning 👋
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] tracking-tight">
+              Good morning 👋
+            </h2>
+            <button
+              onClick={onOpenBriefingModal}
+              className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#99efe5]/60 text-[#006f67] hover:bg-[#99efe5] transition-colors flex items-center gap-1"
+              title="Open Daily Home Briefing"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Daily Briefing</span>
+            </button>
+          </div>
           <p className="text-base md:text-lg text-gray-500 mt-1">
-            Here's what needs your attention today.
+            Here's what needs your attention today across the household.
           </p>
         </div>
-        <button
-          id="btn-ask-homeops-hero"
-          onClick={() => setActiveTab('assistant')}
-          className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-5 py-2.5 rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98"
-        >
-          <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-          Ask HomeOps
-        </button>
+
+        {/* Action Buttons Toolbar */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* What Should I Do Now Signature Trigger */}
+          <button
+            id="btn-what-should-i-do-now"
+            onClick={onOpenWhatNowModal}
+            className="bg-[#006a63] hover:bg-[#00504a] text-white px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98"
+          >
+            <Zap className="w-4 h-4 text-amber-300" />
+            <span>What Should I Do Now?</span>
+          </button>
+
+          {/* Weekly Plan Trigger */}
+          <button
+            id="btn-weekly-plan"
+            onClick={onOpenWeeklyPlanModal}
+            className="bg-white hover:bg-gray-50 border border-[#e2e8f0] text-gray-700 px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs"
+          >
+            <Calendar className="w-4 h-4 text-indigo-600" />
+            <span>Weekly Plan</span>
+          </button>
+
+          {/* Caspian Telegram Demo Trigger */}
+          <button
+            id="btn-caspian-simulator"
+            onClick={onOpenCaspianModal}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs"
+          >
+            <MessageSquare className="w-4 h-4 text-emerald-400" />
+            <span>Caspian Channel</span>
+          </button>
+
+          <button
+            id="btn-ask-homeops-hero"
+            onClick={() => setActiveTab('assistant')}
+            className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg font-medium text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98"
+          >
+            <span className="material-symbols-outlined text-[18px]">smart_toy</span>
+            <span>Ask HomeOps</span>
+          </button>
+        </div>
       </div>
 
       {/* Quick Stats Row */}
@@ -105,10 +158,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#188ace] text-[24px] group-hover:scale-110 transition-transform">
               inventory_2
             </span>
+            <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+              {lowInventoryItems.length} Warnings
+            </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">12</p>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Low Stock</p>
+            <p className="text-2xl font-bold text-[#0F172A]">
+              {lowInventoryItems.length > 0 ? lowInventoryItems.length : 3}
+            </p>
+            <p className="text-xs md:text-sm text-gray-500 font-medium">Low Stock Items</p>
           </div>
         </div>
 
@@ -121,6 +179,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between">
             <span className="material-symbols-outlined text-[#565e74] text-[24px] group-hover:scale-110 transition-transform">
               receipt_long
+            </span>
+            <span className="bg-rose-100 text-rose-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+              Due Tomorrow
             </span>
           </div>
           <div>
@@ -138,6 +199,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center justify-between">
             <span className="material-symbols-outlined text-[#006f67] text-[24px] group-hover:scale-110 transition-transform">
               build
+            </span>
+            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+              HVAC Check
             </span>
           </div>
           <div>
@@ -163,12 +227,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               </div>
               <div className="flex-1">
-                <h3 className="text-base md:text-lg font-bold text-[#115E59]">
-                  HomeOps Recommendation
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base md:text-lg font-bold text-[#115E59]">
+                    HomeOps Recommendation
+                  </h3>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-[#99efe5] text-[#006f67]">
+                    Autonomous Priority
+                  </span>
+                </div>
                 <p className="text-sm text-[#134E4A] mt-1 leading-relaxed">
-                  Pay electricity bill first. It's due tomorrow and late fees apply. You also have 3
-                  low stock items that should be added to today's shopping list.
+                  Pay electricity bill first. It's due tomorrow and late fees apply. You also have low
+                  stock items (detergent, rice) that should be queued to today's shopping list.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
@@ -292,7 +361,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             id="todays-briefing-card"
             className="bg-white p-6 rounded-xl border border-[#e2e8f0] shadow-[0_1px_3px_rgba(15,23,42,0.06)]"
           >
-            <h3 className="text-lg font-bold text-[#0F172A] mb-5">Today's Briefing</h3>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-lg font-bold text-[#0F172A]">Today's Briefing</h3>
+              <button
+                onClick={onOpenBriefingModal}
+                className="text-xs text-[#0F766E] font-semibold hover:underline"
+              >
+                Expand
+              </button>
+            </div>
             <div className="space-y-6 relative before:absolute before:inset-0 before:left-3 before:h-full before:w-0.5 before:bg-[#e2e8f0]">
               {/* Timeline Item 1 */}
               <div className="relative flex items-start gap-4">
@@ -303,7 +380,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-center justify-between mb-0.5">
                     <span className="text-xs font-bold text-[#0F766E]">09:00 AM</span>
                   </div>
-                  <p className="text-xs md:text-sm font-medium text-[#0F172A]">Morning Review</p>
+                  <p className="text-xs md:text-sm font-medium text-[#0F172A]">Morning Operations Review</p>
                 </div>
               </div>
 
@@ -317,7 +394,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="text-xs font-medium text-gray-500">01:00 PM</span>
                   </div>
                   <p className="text-xs md:text-sm font-medium text-[#0F172A]">
-                    Grocery Delivery Expected
+                    Grocery Restock Window
                   </p>
                 </div>
               </div>
@@ -359,7 +436,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div>
                 <div className="flex justify-between text-xs font-medium mb-1">
                   <span className="text-[#0F172A]">Detergent</span>
-                  <span className="text-[#ba1a1a] font-bold">5%</span>
+                  <span className="text-[#ba1a1a] font-bold">5% (Critical)</span>
                 </div>
                 <div className="w-full bg-[#e0e3e5] rounded-full h-2 overflow-hidden">
                   <div className="bg-[#ba1a1a] h-2 rounded-full" style={{ width: '5%' }}></div>

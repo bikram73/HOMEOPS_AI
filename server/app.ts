@@ -27,8 +27,11 @@ export function createExpressApp(): Express {
   // Task Endpoints
   app.post('/api/tasks', (req: Request, res: Response) => {
     const { title, category, priority, dueDate, amount, provider } = req.body;
-    const task = stateManager.addTask(title, category, priority, dueDate, amount, provider);
-    res.json(task);
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'Task title is required' });
+    }
+    const task = stateManager.addTask(title.trim(), category, priority, dueDate, amount, provider);
+    res.status(201).json(task);
   });
 
   app.patch('/api/tasks/:id', (req: Request, res: Response) => {
@@ -36,76 +39,100 @@ export function createExpressApp(): Express {
     const { completed, ...updates } = req.body;
     if (completed !== undefined) {
       const task = stateManager.completeTask(id, completed);
-      return res.json(task || { error: 'Task not found' });
+      if (!task) return res.status(404).json({ error: 'Task not found' });
+      return res.json(task);
     }
     const task = stateManager.updateTask(id, updates);
-    res.json(task || { error: 'Task not found' });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json(task);
   });
 
   app.delete('/api/tasks/:id', (req: Request, res: Response) => {
     const ok = stateManager.deleteTask(req.params.id);
-    res.json({ success: ok });
+    if (!ok) return res.status(404).json({ error: 'Task not found' });
+    res.json({ success: true });
   });
 
   // Inventory Endpoints
   app.post('/api/inventory', (req: Request, res: Response) => {
     const { name, quantity, unit, status, category } = req.body;
-    const item = stateManager.addInventoryItem(name, quantity, unit, status, category);
-    res.json(item);
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Item name is required' });
+    }
+    const item = stateManager.addInventoryItem(name.trim(), quantity, unit, status, category);
+    res.status(201).json(item);
   });
 
   app.patch('/api/inventory/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const { quantity, status } = req.body;
     const item = stateManager.updateInventory(id, quantity, status);
-    res.json(item || { error: 'Item not found' });
+    if (!item) return res.status(404).json({ error: 'Item not found' });
+    res.json(item);
   });
 
   // Shopping Endpoints
   app.post('/api/shopping', (req: Request, res: Response) => {
     const { name, quantity, category } = req.body;
-    const item = stateManager.addShoppingItem(name, quantity, category);
-    res.json(item);
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Shopping item name is required' });
+    }
+    const item = stateManager.addShoppingItem(name.trim(), quantity, category);
+    res.status(201).json(item);
   });
 
   app.patch('/api/shopping/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const { completed } = req.body;
     const item = stateManager.completeShoppingItem(id, completed ?? true);
-    res.json(item || { error: 'Shopping item not found' });
+    if (!item) return res.status(404).json({ error: 'Shopping item not found' });
+    res.json(item);
   });
 
   app.delete('/api/shopping/:id', (req: Request, res: Response) => {
     const ok = stateManager.removeShoppingItem(req.params.id);
-    res.json({ success: ok });
+    if (!ok) return res.status(404).json({ error: 'Shopping item not found' });
+    res.json({ success: true });
   });
 
   // Bills Endpoints
   app.post('/api/bills', (req: Request, res: Response) => {
     const { name, amount, dueDate } = req.body;
-    const bill = stateManager.addBill(name, Number(amount) || 0, dueDate);
-    res.json(bill);
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      return res.status(400).json({ error: 'Bill name is required' });
+    }
+    const parsedAmount = Number(amount);
+    if (amount !== undefined && isNaN(parsedAmount)) {
+      return res.status(400).json({ error: 'Amount must be a valid number' });
+    }
+    const bill = stateManager.addBill(name.trim(), parsedAmount || 0, dueDate || 'Upcoming');
+    res.status(201).json(bill);
   });
 
   app.patch('/api/bills/:id/pay', (req: Request, res: Response) => {
     const { id } = req.params;
     const { paid } = req.body;
     const bill = stateManager.markBillPaid(id, paid !== false);
-    res.json(bill || { error: 'Bill not found' });
+    if (!bill) return res.status(404).json({ error: 'Bill not found' });
+    res.json(bill);
   });
 
   // Maintenance Endpoints
   app.post('/api/maintenance', (req: Request, res: Response) => {
     const { title, category, dueDate, provider } = req.body;
-    const item = stateManager.addMaintenanceTask(title, category, dueDate, provider);
-    res.json(item);
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'Maintenance title is required' });
+    }
+    const item = stateManager.addMaintenanceTask(title.trim(), category, dueDate, provider);
+    res.status(201).json(item);
   });
 
   app.patch('/api/maintenance/:id', (req: Request, res: Response) => {
     const { id } = req.params;
     const { status } = req.body;
     const item = stateManager.completeMaintenanceTask(id, status);
-    res.json(item || { error: 'Maintenance record not found' });
+    if (!item) return res.status(404).json({ error: 'Maintenance record not found' });
+    res.json(item);
   });
 
   // AI Agent Endpoints

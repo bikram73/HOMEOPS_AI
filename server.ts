@@ -155,6 +155,17 @@ async function startServer() {
     res.json(caspianService.getStatus());
   });
 
+  app.get('/api/caspian/channels', async (_req: Request, res: Response) => {
+    const channels = await caspianService.fetchLiveChannels();
+    res.json({ channels });
+  });
+
+  // AnythingLLM Workspace Bridge Endpoints
+  app.get('/api/anythingllm/workspace', (_req: Request, res: Response) => {
+    const { anythingLLMBridge } = require('./server/anythingllm');
+    res.json(anythingLLMBridge.getWorkspaceInfo());
+  });
+
   // Webhook endpoint for live Caspian hosted/self-hosted bot updates
   app.post('/api/caspian/webhook', async (req: Request, res: Response) => {
     try {
@@ -172,7 +183,8 @@ async function startServer() {
       res.status(200).json({
         ok: true,
         response: result.response,
-        tools: result.agentResult.toolsExecuted?.map((t) => t.toolName),
+        sources: result.sources,
+        tools: result.agentToolsExecuted,
       });
     } catch (err: any) {
       console.error('[Caspian Webhook Error]', err);

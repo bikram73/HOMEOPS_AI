@@ -19,13 +19,32 @@ export interface AgentChatResponse {
   updatedState?: HomeState;
 }
 
+export interface CaspianChannel {
+  id: string;
+  name: string;
+  type: string;
+  status: 'connected' | 'available' | 'standby';
+  description: string;
+  icon: string;
+}
+
 export interface CaspianStatusResponse {
   initialized: boolean;
+  agentName: string;
   channel: string;
   hasApiKey: boolean;
+  apiKeyPrefix: string;
+  baseUrl: string;
   botUsername?: string;
   totalMessagesProcessed: number;
   lastActive: string | null;
+  channels?: CaspianChannel[];
+  workspace?: {
+    slug: string;
+    name: string;
+    activeDocumentsCount: number;
+    citedDocuments: string[];
+  };
 }
 
 export const api = {
@@ -194,6 +213,16 @@ export const api = {
   // Caspian status & simulation
   getCaspianStatus: async (): Promise<CaspianStatusResponse> => {
     const res = await fetch('/api/caspian/status');
+    return res.json();
+  },
+
+  getCaspianChannels: async (): Promise<{ channels: CaspianChannel[] }> => {
+    const res = await fetch('/api/caspian/channels');
+    return res.json();
+  },
+
+  getAnythingLLMWorkspace: async () => {
+    const res = await fetch('/api/anythingllm/workspace');
     return res.json();
   },
 

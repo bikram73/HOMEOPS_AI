@@ -39,12 +39,6 @@ export interface CaspianStatusResponse {
   totalMessagesProcessed: number;
   lastActive: string | null;
   channels?: CaspianChannel[];
-  workspace?: {
-    slug: string;
-    name: string;
-    activeDocumentsCount: number;
-    citedDocuments: string[];
-  };
 }
 
 export const api = {

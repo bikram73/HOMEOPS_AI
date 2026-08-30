@@ -3,7 +3,6 @@ import { stateManager } from './state';
 import { tools } from './tools';
 import { processUserMessage } from './gemini';
 import { caspianService } from './caspian';
-import { anythingLLMBridge } from './anythingllm';
 
 export function createExpressApp(): Express {
   const app = express();
@@ -157,12 +156,7 @@ export function createExpressApp(): Express {
     res.json({ channels });
   });
 
-  // AnythingLLM Workspace Bridge Endpoints
-  app.get('/api/anythingllm/workspace', (_req: Request, res: Response) => {
-    res.json(anythingLLMBridge.getWorkspaceInfo());
-  });
-
-  // Webhook endpoint for live Caspian hosted/self-hosted bot updates
+  // Webhook endpoint for live Caspian hosted bot updates
   app.post('/api/caspian/webhook', async (req: Request, res: Response) => {
     try {
       const parsed = caspianService.parseWebhookPayload(req.body);
@@ -179,7 +173,6 @@ export function createExpressApp(): Express {
       res.status(200).json({
         ok: true,
         response: result.response,
-        sources: result.sources,
         tools: result.agentToolsExecuted,
       });
     } catch (err: any) {

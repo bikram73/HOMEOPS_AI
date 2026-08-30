@@ -30,6 +30,7 @@ class CaspianIntegrationService {
 
   private async initCaspian() {
     const apiKey = process.env.CASPIAN_API_KEY;
+    const baseUrl = process.env.CASPIAN_BASE_URL || 'https://api.trycaspianai.com';
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
     if (!apiKey && !botToken) {
@@ -47,6 +48,8 @@ class CaspianIntegrationService {
         this.caspianClient = typeof Caspian === 'function' 
           ? new Caspian({ 
               apiKey: apiKey || '', 
+              baseURL: baseUrl,
+              baseUrl: baseUrl,
               via: apiKey ? 'hosted' : 'self-hosted',
               telegram: botToken ? { token: botToken } : undefined,
             }) 

@@ -32,26 +32,68 @@ class CaspianIntegrationService {
     const apiKey = process.env.CASPIAN_API_KEY;
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
-    if (!apiKey) {
-      console.log('[Caspian] CASPIAN_API_KEY not configured. Running in ready/standby mode with demo message simulator.');
+    if (!apiKey && !botToken) {
+      console.log('[Caspian] CASPIAN_API_KEY / TELEGRAM_BOT_TOKEN not configured. Running in ready/standby mode with simulator.');
       this.isInitialized = true;
       return;
     }
 
     try {
-      // Dynamic import / safe instantiation of caspian-sdk
+      // Dynamic import of caspian-sdk if present
       const caspianModule = await import('caspian-sdk');
       const Caspian = (caspianModule as any).default || caspianModule.Caspian || caspianModule;
 
       if (typeof Caspian === 'function' || typeof Caspian === 'object') {
-        this.caspianClient = typeof Caspian === 'function' ? new Caspian({ apiKey, botToken }) : Caspian;
+        this.caspianClient = typeof Caspian === 'function' 
+          ? new Caspian({ 
+              apiKey: apiKey || '', 
+              via: apiKey ? 'hosted' : 'self-hosted',
+              telegram: botToken ? { token: botToken } : undefined,
+            }) 
+          : Caspian;
         this.isInitialized = true;
-        console.log('[Caspian] SDK successfully initialized for HomeOps AI agent on channel:', this.channel);
+        console.log('[Caspian] SDK successfully initialized with via="hosted" for channel:', this.channel);
       }
     } catch (err) {
       console.warn('[Caspian] Notice initializing caspian-sdk:', (err as Error).message);
       this.isInitialized = true;
     }
+  }
+
+  /**
+   * Parse incoming webhook payload from Caspian gateway or Telegram
+   */
+  public parseWebhookPayload(body: any): { channel: string; senderId: string; text: string } | null {
+    if (!body) return null;
+    
+    // Caspian standard format
+    if (body.message?.text) {
+      return {
+        channel: body.channel || 'Telegram',
+        senderId: body.message?.from?.id?.toString() || body.senderId || 'user_telegram',
+        text: body.message.text,
+      };
+    }
+    
+    // Raw Telegram webhook format
+    if (body.message?.chat && body.message?.text) {
+      return {
+        channel: 'Telegram',
+        senderId: body.message.chat.id.toString(),
+        text: body.message.text,
+      };
+    }
+
+    // Generic JSON { text, channel, senderId }
+    if (body.text) {
+      return {
+        channel: body.channel || 'Telegram',
+        senderId: body.senderId || 'user_generic',
+        text: body.text,
+      };
+    }
+
+    return null;
   }
 
   /**

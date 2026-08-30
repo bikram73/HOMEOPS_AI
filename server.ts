@@ -155,6 +155,31 @@ async function startServer() {
     res.json(caspianService.getStatus());
   });
 
+  // Webhook endpoint for live Caspian hosted/self-hosted bot updates
+  app.post('/api/caspian/webhook', async (req: Request, res: Response) => {
+    try {
+      const parsed = caspianService.parseWebhookPayload(req.body);
+      if (!parsed || !parsed.text) {
+        return res.status(200).json({ ok: true, note: 'Ignored non-text payload' });
+      }
+
+      const result = await caspianService.handleIncomingMessage(
+        parsed.channel,
+        parsed.senderId,
+        parsed.text
+      );
+
+      res.status(200).json({
+        ok: true,
+        response: result.response,
+        tools: result.agentResult.toolsExecuted?.map((t) => t.toolName),
+      });
+    } catch (err: any) {
+      console.error('[Caspian Webhook Error]', err);
+      res.status(500).json({ error: err.message || 'Webhook processing failed' });
+    }
+  });
+
   app.post('/api/caspian/simulate', async (req: Request, res: Response) => {
     const { text, channel, senderId } = req.body;
     if (!text) return res.status(400).json({ error: 'Text message is required' });

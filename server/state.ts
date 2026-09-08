@@ -350,15 +350,21 @@ class StateManager {
     name: string,
     quantity: number = 100,
     unit: string = 'unit',
-    status: InventoryItem['status'] = 'good',
+    status?: InventoryItem['status'],
     category: string = 'General'
   ): InventoryItem {
+    const computedStatus: InventoryItem['status'] =
+      status || (quantity <= 20 ? 'critical' : quantity <= 35 ? 'low' : 'good');
+
     const existing = this.state.inventory.find(
       (i) => i.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
       existing.quantity = quantity;
-      existing.status = status;
+      existing.status = computedStatus;
+      if (computedStatus === 'low' || computedStatus === 'critical') {
+        this.addShoppingItem(existing.name, '1 unit', existing.category);
+      }
       return existing;
     }
 
@@ -368,12 +374,17 @@ class StateManager {
       category,
       quantity,
       unit,
-      status,
+      status: computedStatus,
       icon: 'inventory_2',
       lastRestocked: 'Just now',
     };
     this.state.inventory.push(newItem);
     this.recordActivity('Inventory Added', `${name} (${quantity}%)`, 'inventory');
+
+    if (computedStatus === 'low' || computedStatus === 'critical') {
+      this.addShoppingItem(newItem.name, '1 unit', newItem.category);
+    }
+
     return newItem;
   }
 
@@ -462,9 +473,11 @@ class StateManager {
     return newBill;
   }
 
-  public markBillPaid(idOrName: string, paid: boolean = true): Bill | null {
+  public markBillPaid(idOrName?: string, paid: boolean = true): Bill | null {
+    if (!idOrName || typeof idOrName !== 'string' || !idOrName.trim()) return null;
+    const target = idOrName.trim().toLowerCase();
     const bill = this.state.bills.find(
-      (b) => b.id === idOrName || b.name.toLowerCase().includes(idOrName.toLowerCase())
+      (b) => b.id.toLowerCase() === target || b.name.toLowerCase().includes(target)
     );
     if (!bill) return null;
     bill.paid = paid;

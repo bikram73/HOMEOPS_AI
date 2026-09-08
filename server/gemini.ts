@@ -317,6 +317,37 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     };
   }
 
+  // 4a. Explicit Add to Inventory: "Add 6 bananas to inventory" / "Add olive oil to stock"
+  if (
+    msg.includes('add') &&
+    (msg.includes('inventory') || msg.includes('stock') || msg.includes('pantry') || msg.includes('fridge')) &&
+    !msg.includes('shopping')
+  ) {
+    const match = msg.match(/add\s+(?:(\d+)\s+)?([a-zA-Z\s]+?)\s+(?:to|in)\s+(?:my\s+)?(?:inventory|stock|pantry|fridge)/i);
+    let qty = 100;
+    let name = 'Supplies';
+    if (match) {
+      if (match[1]) {
+        const parsedNum = parseInt(match[1], 10);
+        qty = parsedNum <= 10 ? parsedNum * 10 : Math.min(100, parsedNum);
+      }
+      if (match[2]) {
+        name = match[2].trim();
+      }
+    } else {
+      const fallbackMatch = msg.match(/add\s+([a-zA-Z0-9\s]+?)\s+to/i);
+      if (fallbackMatch && fallbackMatch[1]) name = fallbackMatch[1].trim();
+    }
+
+    const invRes = tools.updateInventory({ nameOrId: name, quantity: qty });
+    toolsExecuted.push({ toolName: 'updateInventory', args: { nameOrId: name, quantity: qty }, result: invRes });
+
+    return {
+      response: `Added **${name}** to your household inventory at **${qty}%** stock.`,
+      toolsExecuted,
+    };
+  }
+
   // 4. Low stock / inventory update: "running low on detergent" / "out of toothpaste" / "rice is low"
   if (
     msg.includes('running low on') ||
@@ -395,8 +426,50 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     }
   }
 
-  // 6. Complete task: "mark clean the kitchen as complete" / "mark the sink task done" / "completed electricity bill"
-  if (msg.includes('complete') || msg.includes('mark') || msg.includes('done')) {
+  // 5b. Bill payment: "mark my electricity bill as paid" / "mark bill paid" / "pay the electricity bill" / "pay the bill"
+  if (
+    (msg.includes('mark') || msg.includes('set') || msg.includes('pay')) &&
+    (msg.includes('paid') || msg.includes('pay')) &&
+    msg.includes('bill')
+  ) {
+    const currentState = stateManager.getState();
+    const unpaidBills = currentState.bills.filter((b) => !b.paid);
+
+    let billName = '';
+    if (msg.includes('electricity') || msg.includes('power')) billName = 'electricity';
+    else if (msg.includes('internet') || msg.includes('wifi')) billName = 'internet';
+    else if (msg.includes('water')) billName = 'water';
+    else if (msg.includes('gas')) billName = 'gas';
+    else {
+      const match = msg.match(/(?:mark|set|pay)\s+(?:my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s+bill|\s+as paid|\s+paid|\s+now)/i);
+      if (match && match[1]) {
+        const candidate = match[1].trim();
+        if (candidate && candidate.toLowerCase() !== 'the' && candidate.toLowerCase() !== 'my') {
+          billName = candidate;
+        }
+      }
+    }
+
+    if (!billName) {
+      return {
+        response: `Which bill would you like to pay? You currently have ${unpaidBills.length} unpaid bills: ${unpaidBills.map((b) => `**${b.name}** ($${b.amount}, ${b.dueDate})`).join(', ')}. Please specify the bill name.`,
+        toolsExecuted: [],
+      };
+    }
+
+    const payRes = tools.markBillPaid({ idOrName: billName, paid: true });
+    toolsExecuted.push({ toolName: 'markBillPaid', args: { idOrName: billName, paid: true }, result: payRes });
+
+    return {
+      response: payRes.success
+        ? `I have marked your **${payRes.data?.name || billName}** bill ($${payRes.data?.amount || ''}) as **PAID** in your financial ledger.`
+        : `Could not find a bill matching "${billName}".`,
+      toolsExecuted,
+    };
+  }
+
+  // 6. Complete task: "mark clean the kitchen as complete" / "mark the sink task done"
+  if ((msg.includes('complete') || msg.includes('mark') || msg.includes('done')) && !msg.includes('bill')) {
     let taskName = '';
     if (msg.includes('kitchen') || msg.includes('sink')) taskName = 'kitchen';
     else if (msg.includes('electricity') || msg.includes('power')) taskName = 'electricity';
@@ -508,21 +581,42 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
       }
     }
 
-    // Bill payment status check: "Did you pay my electricity bill?", "Is electricity bill paid?"
-    if (msg.includes('did you pay') || msg.includes('bill paid') || msg.includes('is the electricity bill paid')) {
-      const electricityBill = currentState.bills.find(b => b.name.toLowerCase().includes('electricity') || b.name.toLowerCase().includes('power'));
-      if (electricityBill) {
-        if (electricityBill.paid) {
+    // Bill payment status check: "Did you pay my electricity bill?", "Did I pay my yacht insurance bill?"
+    if (
+      msg.includes('did you pay') ||
+      msg.includes('did i pay') ||
+      msg.includes('have i paid') ||
+      msg.includes('bill paid') ||
+      msg.includes('is the bill paid') ||
+      (msg.includes('is') && msg.includes('bill paid'))
+    ) {
+      const match = msg.match(/(?:did you pay|did i pay|have i paid|is|was)\s+(?:my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s+bill|\s+paid|\?|$)/i);
+      const queriedName = match && match[1] ? match[1].replace(/my|the|bill|paid|\?/gi, '').trim().toLowerCase() : '';
+
+      const foundBill = currentState.bills.find(b =>
+        (queriedName && b.name.toLowerCase().includes(queriedName)) ||
+        (msg.includes('electricity') && (b.name.toLowerCase().includes('electricity') || b.name.toLowerCase().includes('power'))) ||
+        (msg.includes('water') && b.name.toLowerCase().includes('water')) ||
+        (msg.includes('internet') && (b.name.toLowerCase().includes('internet') || b.name.toLowerCase().includes('wifi')))
+      );
+
+      if (foundBill) {
+        if (foundBill.paid) {
           return {
-            response: `Yes, your **${electricityBill.name}** ($${electricityBill.amount}) has been marked as **PAID**.`,
-            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: electricityBill } }],
+            response: `Yes, your **${foundBill.name}** ($${foundBill.amount}) has been marked as **PAID**.`,
+            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: foundBill } }],
           };
         } else {
           return {
-            response: `No, your **${electricityBill.name}** ($${electricityBill.amount}) is **UNPAID** and currently due **${electricityBill.dueDate}**. Would you like me to mark it as paid now?`,
-            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: electricityBill } }],
+            response: `No, your **${foundBill.name}** ($${foundBill.amount}) is **UNPAID** and currently due **${foundBill.dueDate}**. Would you like me to mark it as paid now?`,
+            toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Checked bill status', data: foundBill } }],
           };
         }
+      } else {
+        return {
+          response: `I don't have any record of a "${queriedName || 'queried'}" bill in your household records. Your tracked bills are: ${currentState.bills.map(b => b.name).join(', ')}.`,
+          toolsExecuted: [{ toolName: 'listBills', args: {}, result: { success: true, message: 'Bill not found', data: null } }],
+        };
       }
     }
 

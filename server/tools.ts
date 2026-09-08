@@ -210,9 +210,13 @@ export const tools = {
     };
   },
 
-  markBillPaid: (args: { idOrName: string }): ToolResult => {
-    const bill = stateManager.markBillPaid(args.idOrName, true);
-    if (!bill) return { success: false, message: `Could not find bill matching "${args.idOrName}"` };
+  markBillPaid: (args: { idOrName?: string; billName?: string; name?: string; paid?: boolean }): ToolResult => {
+    const target = (args.idOrName || args.billName || args.name || '').trim();
+    if (!target) {
+      return { success: false, message: 'Please specify which bill you would like to mark as paid.' };
+    }
+    const bill = stateManager.markBillPaid(target, args.paid !== false);
+    if (!bill) return { success: false, message: `Could not find bill matching "${target}"` };
     return {
       success: true,
       message: `Marked "${bill.name}" as PAID ($${bill.amount}).`,

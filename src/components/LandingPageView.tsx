@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { PageTab } from '../types';
-import { LOGO_URL } from '../data/mockData';
+import { LOGO_URL, HERO_IMAGE_URL } from '../data/mockData';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   CheckSquare,
@@ -57,8 +57,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
     };
   }, []);
 
-  const heroImageSrc =
-    'https://lh3.googleusercontent.com/aida/AEtjO1VlJX0YISrdfLnSMPxpXKf8T-NsvHWIms3vpdPq4CsxYYOkVqmR5vhYg9GQAIKCvuFxkwECms8MI41ZLLxpTQe2RsTvAH9Isc4p--YeRCNxaWtGjmAqgvXAvjHUcC8_S36wZvLMIQWJH_2M7Bl9TDECr7NGtkjA4-3qc0Rc7KpjKY7T6i7H1DSXNDdSA4fzeK1b8yCYee7vsYE6EjzSdwIibrkAWyumxaJH2sSUl_8llSgxZjsCo4_Fww';
+  const fallbackHeroImage =
+    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80';
+  const [heroImageSrc, setHeroImageSrc] = useState<string>(HERO_IMAGE_URL || fallbackHeroImage);
 
   return (
     <div className="min-h-screen bg-[#f7f9fb] text-[#191c1e] font-sans antialiased flex flex-col selection:bg-[#99efe5] selection:text-[#006f67]">
@@ -230,9 +231,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
             className="w-full rounded-xl overflow-hidden border border-[#c6c6cd]/80 shadow-sm bg-white cursor-pointer group relative transition-all duration-300 hover:border-[#006a63] hover:shadow-md"
           >
             <img
+              id="hero-showcase-img"
               alt="HomeOps AI Modern Living Interior"
-              className="w-full h-auto object-cover max-h-[600px] transition-transform duration-700 group-hover:scale-[1.01]"
+              className="w-full h-[320px] sm:h-[420px] md:h-[500px] lg:h-[560px] object-cover transition-transform duration-700 group-hover:scale-[1.01]"
               src={heroImageSrc}
+              referrerPolicy="no-referrer"
+              loading="eager"
+              onError={() => {
+                if (heroImageSrc !== fallbackHeroImage) {
+                  setHeroImageSrc(fallbackHeroImage);
+                }
+              }}
             />
             {/* Subtle overlay badge in bottom right corner */}
             <div className="absolute bottom-4 right-4 bg-[#131b2e]/90 text-white backdrop-blur-md px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 border border-white/20 shadow-md">

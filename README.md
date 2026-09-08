@@ -12,6 +12,7 @@
 [![Express](https://img.shields.io/badge/Express-4.21-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
 [![Google Gemini](https://img.shields.io/badge/Google%20Gemini-2.5%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://ai.google.dev/)
 [![Caspian SDK](https://img.shields.io/badge/Caspian%20SDK-Multi--Channel-006A63?style=for-the-badge)](https://trycaspianai.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](./LICENSE)
 
 ---
 
@@ -471,7 +472,7 @@ The application is engineered for responsive, low-latency household interactions
 <a name="license"></a>
 ## 📄 License
 
-This project is licensed under the **MIT License**. See `LICENSE` for details.
+This project is licensed under the **MIT License** — see the full license text in the [LICENSE](./LICENSE) file.
 
 <div align="center">
 

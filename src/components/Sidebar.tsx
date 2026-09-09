@@ -31,19 +31,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Brand & Home Header */}
       <div
         id="sidebar-brand"
-        onClick={() => setActiveTab('home')}
-        className="flex items-center gap-3 px-3 mb-8 cursor-pointer group"
+        onClick={() => setActiveTab('landing')}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setActiveTab('landing');
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        title="Return to Home / Landing Page"
+        className="flex items-center gap-3 px-3 py-2.5 -mx-1 mb-7 cursor-pointer group rounded-xl border border-transparent hover:border-[#334155]/60 hover:bg-white/[0.06] transition-all duration-200 active:scale-[0.98] select-none outline-none focus-visible:ring-2 focus-visible:ring-[#99efe5]/50"
       >
         <img
           src={LOGO_URL}
           alt="HomeOps Logo"
-          className="w-9 h-9 rounded-lg object-contain bg-white/10 p-1 group-hover:scale-105 transition-transform"
+          className="w-9 h-9 rounded-lg object-contain bg-white/10 p-1 group-hover:scale-105 group-hover:ring-2 group-hover:ring-[#99efe5]/30 transition-all duration-200"
         />
-        <div>
-          <h1 className="text-xl font-bold text-white tracking-tight leading-none flex items-center gap-1.5">
-            HomeOps AI
-          </h1>
-          <p className="text-xs text-[#99efe5]/80 mt-1 font-medium">Demo Home</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold text-white tracking-tight leading-none flex items-center gap-1.5 group-hover:text-[#99efe5] transition-colors">
+              HomeOps AI
+            </h1>
+            <span className="material-symbols-outlined text-xs text-white/40 group-hover:text-[#99efe5] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200">
+              arrow_back
+            </span>
+          </div>
+          <p className="text-xs text-[#99efe5]/80 mt-1 font-medium flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#99efe5] animate-pulse"></span>
+            Demo Home
+          </p>
         </div>
       </div>
 

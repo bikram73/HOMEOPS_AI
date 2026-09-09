@@ -31,7 +31,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       className="flex justify-between items-center w-full px-4 md:px-8 py-3.5 bg-white border-b border-[#e2e8f0] shadow-sm sticky top-0 z-30"
     >
       {/* Mobile brand & Logo */}
-      <div className="md:hidden flex items-center gap-2.5">
+      <div
+        onClick={() => setActiveTab('landing')}
+        className="md:hidden flex items-center gap-2.5 cursor-pointer hover:opacity-85 transition-opacity"
+        title="Return to Home / Landing Page"
+        role="button"
+        tabIndex={0}
+      >
         <img
           src={LOGO_URL}
           alt="HomeOps Logo"
@@ -156,6 +162,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 <p className="text-xs font-semibold text-[#0F172A]">Demo Household</p>
                 <p className="text-[11px] text-gray-500">4 Members • Active Ops</p>
               </div>
+              <button
+                onClick={() => {
+                  setActiveTab('landing');
+                  setShowUserMenu(false);
+                }}
+                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">public</span> Landing Page
+              </button>
               <button
                 onClick={() => {
                   setActiveTab('home');

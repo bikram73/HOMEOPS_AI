@@ -26,6 +26,29 @@ import { BriefingModal } from './components/BriefingModal';
 import { WeeklyPlanModal } from './components/WeeklyPlanModal';
 import { CaspianDemoModal } from './components/CaspianDemoModal';
 import { AnalyticsModal } from './components/AnalyticsModal';
+import { OnboardingModal } from './components/OnboardingModal';
+import { UserProfile } from './types';
+import {
+  getProfile,
+  saveProfile,
+  hasCompletedOnboarding,
+  clearProfile,
+} from './utils/profileStore';
+import {
+  saveHouseholdState,
+  loadHouseholdState,
+  clearHouseholdState,
+} from './utils/statePersistence';
+import {
+  saveConversation,
+  loadConversation,
+  clearConversation,
+} from './utils/conversationStore';
+import {
+  generateBackupData,
+  downloadBackupFile,
+  importBackupData,
+} from './utils/exportImport';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<PageTab>('landing');
@@ -38,6 +61,10 @@ export function App() {
   const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(INITIAL_CHAT);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+
+  // User Profile & Onboarding State
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // UI modal states
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -138,9 +165,106 @@ export function App() {
     }
   }, []);
 
+  // Initialize from client persistence (IndexedDB + localStorage) on mount
   useEffect(() => {
-    syncServerState();
+    const initializeAppData = async () => {
+      // 1. Check onboarding
+      const completed = hasCompletedOnboarding();
+      if (!completed) {
+        setIsOnboardingOpen(true);
+      } else {
+        const prof = await getProfile();
+        setUserProfile(prof);
+      }
+
+      // 2. Check IndexedDB for existing household records
+      const persistedState = await loadHouseholdState();
+      const persistedChat = await loadConversation();
+
+      if (persistedChat && persistedChat.length > 0) {
+        setChatHistory(persistedChat);
+      }
+
+      if (persistedState && persistedState.tasks && persistedState.tasks.length > 0) {
+        setTasks(persistedState.tasks);
+        if (persistedState.inventory?.length) setInventory(persistedState.inventory);
+        if (persistedState.shopping?.length) setShoppingItems(persistedState.shopping);
+        if (persistedState.bills?.length) setBills(persistedState.bills);
+        if (persistedState.activities?.length) setActivities(persistedState.activities);
+
+        // Synchronize backend with restored data so Gemini / Caspian stay aware
+        try {
+          await api.syncStateWithServer({
+            tasks: persistedState.tasks as any,
+            inventory: persistedState.inventory as any,
+            shopping: persistedState.shopping as any,
+            bills: persistedState.bills as any,
+            activities: persistedState.activities as any,
+          });
+        } catch {
+          // graceful fallback
+        }
+      } else {
+        // First visit or initial load: sync from server and save initial state
+        await syncServerState();
+      }
+    };
+
+    initializeAppData();
   }, [syncServerState]);
+
+  // Persist changes to IndexedDB automatically
+  useEffect(() => {
+    saveHouseholdState({
+      tasks,
+      inventory,
+      shopping: shoppingItems,
+      bills,
+      activities,
+    });
+  }, [tasks, inventory, shoppingItems, bills, activities]);
+
+  // Persist chat conversations to IndexedDB automatically
+  useEffect(() => {
+    if (chatHistory && chatHistory.length > 0) {
+      saveConversation(chatHistory);
+    }
+  }, [chatHistory]);
+
+  const handleOnboardingComplete = async (newProfile: UserProfile) => {
+    setUserProfile(newProfile);
+    setIsOnboardingOpen(false);
+    await saveHouseholdState({
+      tasks,
+      inventory,
+      shopping: shoppingItems,
+      bills,
+      activities,
+    });
+    if (activeTab === 'landing') {
+      setActiveTab('home');
+    }
+  };
+
+  const handleClearData = async () => {
+    await clearProfile();
+    await clearHouseholdState();
+    await clearConversation();
+    setUserProfile(null);
+    setTasks(INITIAL_TASKS);
+    setInventory(INITIAL_INVENTORY);
+    setShoppingItems(INITIAL_SHOPPING);
+    setBills(INITIAL_BILLS);
+    setActivities(INITIAL_ACTIVITIES);
+    setChatHistory(INITIAL_CHAT);
+    try {
+      await api.resetState();
+    } catch {
+      // ignore
+    }
+    setIsSettingsOpen(false);
+    setIsOnboardingOpen(true);
+  };
 
   // Handlers for Tasks
   const handleToggleTask = async (id: string) => {
@@ -469,6 +593,7 @@ export function App() {
               setViewMode={setViewMode}
               onOpenNotifications={() => setIsNotificationsOpen(true)}
               unreadCount={2}
+              profile={userProfile}
             />
 
             {/* View Routers */}
@@ -478,6 +603,9 @@ export function App() {
                   tasks={tasks}
                   onToggleTask={handleToggleTask}
                   inventory={inventory}
+                  shoppingItems={shoppingItems}
+                  bills={bills}
+                  userProfile={userProfile}
                   setActiveTab={setActiveTab}
                   onAddAllLowToShopping={handleAddAllLowToShopping}
                   onSelectTask={(t) => setSelectedTask(t)}
@@ -535,7 +663,52 @@ export function App() {
       )}
 
       {/* Settings Modal */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        profile={userProfile}
+        onUpdateProfile={async (updated) => {
+          setUserProfile(updated);
+          await saveProfile(updated);
+        }}
+        onExportData={async () => {
+          const backup = await generateBackupData();
+          downloadBackupFile(backup);
+        }}
+        onImportData={async (jsonString: string) => {
+          const res = await importBackupData(jsonString);
+          if (res.success && res.data) {
+            setUserProfile(res.data.profile);
+            setTasks(res.data.tasks);
+            setInventory(res.data.inventory);
+            setShoppingItems(res.data.shopping);
+            setBills(res.data.bills);
+            setActivities(res.data.activities);
+            if (res.data.conversations && res.data.conversations.length > 0) {
+              setChatHistory(res.data.conversations);
+            }
+            try {
+              await api.syncStateWithServer({
+                tasks: res.data.tasks as any,
+                inventory: res.data.inventory as any,
+                shopping: res.data.shopping as any,
+                bills: res.data.bills as any,
+                activities: res.data.activities as any,
+              });
+            } catch {
+              // ignore
+            }
+          }
+          return res;
+        }}
+        onClearData={handleClearData}
+      />
+
+      {/* First-Time Onboarding Modal */}
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onComplete={handleOnboardingComplete}
+      />
 
       {/* Help & Guide Modal */}
       <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />

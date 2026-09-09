@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { PageTab, TaskItem, InventoryItem } from '../types';
+import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, UserProfile } from '../types';
 import { HERO_IMAGE_URL } from '../data/mockData';
 import { Sparkles, Calendar, Zap, MessageSquare } from 'lucide-react';
+import { ReturningUserGreeting } from './ReturningUserGreeting';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
   onToggleTask: (id: string) => void;
   inventory: InventoryItem[];
+  shoppingItems?: ShoppingItem[];
+  bills?: BillItem[];
+  userProfile?: UserProfile | null;
   setActiveTab: (tab: PageTab) => void;
   onAddAllLowToShopping: () => void;
   onSelectTask: (task: TaskItem) => void;
@@ -20,6 +24,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   tasks,
   onToggleTask,
   inventory,
+  shoppingItems = [],
+  bills = [],
+  userProfile,
   setActiveTab,
   onAddAllLowToShopping,
   onSelectTask,
@@ -67,11 +74,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] tracking-tight">
-              Good morning 👋
+              Good morning{userProfile?.name ? `, ${userProfile.name}` : ''} 👋
             </h2>
             <button
               onClick={onOpenBriefingModal}
-              className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#99efe5]/60 text-[#006f67] hover:bg-[#99efe5] transition-colors flex items-center gap-1"
+              className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#99efe5]/60 text-[#006f67] hover:bg-[#99efe5] transition-colors flex items-center gap-1 cursor-pointer"
               title="Open Daily Home Briefing"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -79,7 +86,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </button>
           </div>
           <p className="text-base md:text-lg text-gray-500 mt-1">
-            Here's what needs your attention today across the household.
+            {userProfile?.householdName ? `${userProfile.householdName} • ` : ''}Here's what needs your attention today across the household.
           </p>
         </div>
 
@@ -89,7 +96,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-what-should-i-do-now"
             onClick={onOpenWhatNowModal}
-            className="bg-[#006a63] hover:bg-[#00504a] text-white px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98"
+            className="bg-[#006a63] hover:bg-[#00504a] text-white px-4 py-2.5 rounded-lg font-bold text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98 cursor-pointer"
           >
             <Zap className="w-4 h-4 text-amber-300" />
             <span>What Should I Do Now?</span>
@@ -99,7 +106,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-weekly-plan"
             onClick={onOpenWeeklyPlanModal}
-            className="bg-white hover:bg-gray-50 border border-[#e2e8f0] text-gray-700 px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs"
+            className="bg-white hover:bg-gray-50 border border-[#e2e8f0] text-gray-700 px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer"
           >
             <Calendar className="w-4 h-4 text-indigo-600" />
             <span>Weekly Plan</span>
@@ -109,7 +116,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-caspian-simulator"
             onClick={onOpenCaspianModal}
-            className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs"
+            className="bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-2.5 rounded-lg font-semibold text-xs md:text-sm flex items-center gap-2 transition-all shadow-xs cursor-pointer"
           >
             <MessageSquare className="w-4 h-4 text-emerald-400" />
             <span>Caspian Channel</span>
@@ -118,13 +125,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             id="btn-ask-homeops-hero"
             onClick={() => setActiveTab('assistant')}
-            className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg font-medium text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98"
+            className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg font-medium text-xs md:text-sm flex items-center gap-2 transition-all shadow-sm hover:shadow active:scale-98 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">smart_toy</span>
             <span>Ask HomeOps</span>
           </button>
         </div>
       </div>
+
+      {/* Returning User Quick Status Overview */}
+      <ReturningUserGreeting
+        profile={userProfile || null}
+        tasks={tasks}
+        inventory={inventory}
+        shoppingItems={shoppingItems}
+        bills={bills}
+        onOpenWhatNowModal={onOpenWhatNowModal || (() => {})}
+        onOpenBriefingModal={onOpenBriefingModal || (() => {})}
+      />
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">

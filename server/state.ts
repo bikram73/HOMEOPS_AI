@@ -540,6 +540,35 @@ class StateManager {
   public incrementPlanCount() {
     this.state.analytics.aiPlansGenerated++;
   }
+
+  public syncFromClient(clientState: {
+    tasks?: Task[];
+    inventory?: InventoryItem[];
+    shopping?: ShoppingItem[];
+    bills?: Bill[];
+    maintenance?: MaintenanceTask[];
+    activities?: ActivityLog[];
+  }): HomeState {
+    if (Array.isArray(clientState.tasks) && clientState.tasks.length > 0) {
+      this.state.tasks = clientState.tasks;
+    }
+    if (Array.isArray(clientState.inventory) && clientState.inventory.length > 0) {
+      this.state.inventory = clientState.inventory;
+    }
+    if (Array.isArray(clientState.shopping)) {
+      this.state.shopping = clientState.shopping;
+    }
+    if (Array.isArray(clientState.bills) && clientState.bills.length > 0) {
+      this.state.bills = clientState.bills;
+    }
+    if (Array.isArray(clientState.maintenance) && clientState.maintenance.length > 0) {
+      this.state.maintenance = clientState.maintenance;
+    }
+    if (Array.isArray(clientState.activities) && clientState.activities.length > 0) {
+      this.state.activities = clientState.activities;
+    }
+    return this.getState();
+  }
 }
 
 export const stateManager = new StateManager();

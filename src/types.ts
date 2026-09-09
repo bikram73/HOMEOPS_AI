@@ -76,6 +76,46 @@ export interface ActivityItem {
   icon: string;
 }
 
+export interface HouseholdMember {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  householdName: string;
+  city?: string;
+  currency: string;
+  notificationPref: 'dashboard' | 'telegram' | 'both';
+  members?: HouseholdMember[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HomeOpsPreferences {
+  theme: 'light' | 'dark' | 'system';
+  currency: string;
+  autoReplenish: boolean;
+  onboardingCompleted: boolean;
+  notificationPref?: 'dashboard' | 'telegram' | 'both';
+}
+
+export interface StoredHouseholdData {
+  version: string;
+  exportedAt: string;
+  profile: UserProfile;
+  preferences?: HomeOpsPreferences;
+  tasks: TaskItem[];
+  inventory: InventoryItem[];
+  shopping: ShoppingItem[];
+  bills: BillItem[];
+  maintenance?: any[];
+  activities: ActivityItem[];
+  conversations?: ChatMessage[];
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';

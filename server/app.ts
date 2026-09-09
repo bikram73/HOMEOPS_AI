@@ -19,6 +19,11 @@ export function createExpressApp(): Express {
     res.json(stateManager.getState());
   });
 
+  app.post('/api/state/sync', (req: Request, res: Response) => {
+    const synced = stateManager.syncFromClient(req.body || {});
+    res.json({ message: 'State synchronized with client storage', state: synced });
+  });
+
   app.post('/api/reset', (_req: Request, res: Response) => {
     const fresh = stateManager.resetState();
     res.json({ message: 'State reset to initial seed values', state: fresh });

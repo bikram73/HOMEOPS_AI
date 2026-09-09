@@ -49,6 +49,16 @@ export const api = {
     return res.json();
   },
 
+  syncStateWithServer: async (clientState: Partial<HomeState>): Promise<{ message: string; state: HomeState }> => {
+    const res = await fetch('/api/state/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clientState),
+    });
+    if (!res.ok) throw new Error('Failed to sync state with server');
+    return res.json();
+  },
+
   resetState: async (): Promise<{ message: string; state: HomeState }> => {
     const res = await fetch('/api/reset', { method: 'POST' });
     if (!res.ok) throw new Error('Failed to reset state');

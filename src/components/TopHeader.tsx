@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PageTab } from '../types';
+import { PageTab, UserProfile } from '../types';
 import { LOGO_URL } from '../data/mockData';
 
 interface TopHeaderProps {
@@ -11,6 +11,7 @@ interface TopHeaderProps {
   setViewMode: (mode: 'desktop' | 'mobile-preview') => void;
   onOpenNotifications: () => void;
   unreadCount?: number;
+  profile?: UserProfile | null;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -22,8 +23,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   setViewMode,
   onOpenNotifications,
   unreadCount = 2,
+  profile,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const displayName = profile?.name || 'Demo Home';
+  const householdName = profile?.householdName || 'My Household';
 
   return (
     <header
@@ -135,18 +139,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span className="material-symbols-outlined text-[22px]">smart_toy</span>
         </button>
 
-        {/* User / Demo Home Pill */}
+        {/* User / Household Profile Pill */}
         <div className="relative">
           <button
             id="btn-user-profile"
             onClick={() => setShowUserMenu(!showUserMenu)}
-            className="flex items-center gap-2 pl-2 pr-3 py-1.5 border border-[#e2e8f0] rounded-full hover:bg-[#f8fafc] transition-colors bg-white"
+            className="flex items-center gap-2 pl-2 pr-3 py-1.5 border border-[#e2e8f0] rounded-full hover:bg-[#f8fafc] transition-colors bg-white cursor-pointer"
           >
-            <span className="material-symbols-outlined text-gray-500 text-[20px]">
-              account_circle
+            <span className="w-5 h-5 rounded-full bg-[#0F766E]/10 text-[#0F766E] flex items-center justify-center text-[10px] font-bold">
+              {displayName.charAt(0).toUpperCase()}
             </span>
-            <span className="text-xs font-semibold text-[#0F172A] hidden sm:inline">
-              Demo Home
+            <span className="text-xs font-semibold text-[#0F172A] hidden sm:inline max-w-[120px] truncate">
+              {displayName}
             </span>
             <span className="material-symbols-outlined text-gray-400 text-[16px]">
               arrow_drop_down
@@ -159,15 +163,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               className="absolute right-0 mt-2 w-52 bg-white rounded-xl shadow-lg border border-[#e2e8f0] py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
             >
               <div className="px-4 py-2 border-b border-gray-100">
-                <p className="text-xs font-semibold text-[#0F172A]">Demo Household</p>
-                <p className="text-[11px] text-gray-500">4 Members • Active Ops</p>
+                <p className="text-xs font-semibold text-[#0F172A] truncate">{householdName}</p>
+                <p className="text-[11px] text-gray-500 truncate">
+                  {profile?.city ? `${profile.city} • ` : ''}Active Ops
+                </p>
               </div>
               <button
                 onClick={() => {
                   setActiveTab('landing');
                   setShowUserMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">public</span> Landing Page
               </button>
@@ -176,7 +182,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   setActiveTab('home');
                   setShowUserMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-[16px]">home</span> Dashboard
               </button>
@@ -185,9 +191,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   setActiveTab('settings');
                   setShowUserMenu(false);
                 }}
-                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-xs text-gray-700 hover:bg-[#f8fafc] flex items-center gap-2 cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">settings</span> Settings
+                <span className="material-symbols-outlined text-[16px]">settings</span> Settings &amp; Data
               </button>
             </div>
           )}

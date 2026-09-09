@@ -57,9 +57,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               arrow_back
             </span>
           </div>
-          <p className="text-xs text-[#99efe5]/80 mt-1 font-medium flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#99efe5] animate-pulse"></span>
-            Demo Home
+          <p className="text-xs text-[#99efe5]/90 mt-1 font-medium flex items-center gap-1.5 whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#99efe5] shrink-0 animate-pulse"></span>
+            Return to Landing
           </p>
         </div>
       </div>

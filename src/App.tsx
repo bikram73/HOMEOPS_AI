@@ -65,6 +65,7 @@ export function App() {
   // User Profile & Onboarding State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [pendingTabAfterOnboarding, setPendingTabAfterOnboarding] = useState<PageTab>('home');
 
   // UI modal states
   const [selectedTask, setSelectedTask] = useState<TaskItem | null>(null);
@@ -170,12 +171,12 @@ export function App() {
     const initializeAppData = async () => {
       // 1. Check onboarding
       const completed = hasCompletedOnboarding();
-      if (!completed) {
-        setIsOnboardingOpen(true);
-      } else {
+      if (completed) {
         const prof = await getProfile();
         setUserProfile(prof);
       }
+      // Note: Do not auto-open onboarding on initial mount so users can explore
+      // the landing page and click "Get Started" to initiate onboarding.
 
       // 2. Check IndexedDB for existing household records
       const persistedState = await loadHouseholdState();
@@ -231,6 +232,17 @@ export function App() {
     }
   }, [chatHistory]);
 
+  const handleLaunchApp = (targetTab: PageTab = 'home') => {
+    const completed = hasCompletedOnboarding();
+    if (!completed) {
+      setPendingTabAfterOnboarding(targetTab);
+      setIsOnboardingOpen(true);
+    } else {
+      setActiveTab(targetTab);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const handleOnboardingComplete = async (newProfile: UserProfile) => {
     setUserProfile(newProfile);
     setIsOnboardingOpen(false);
@@ -241,8 +253,15 @@ export function App() {
       bills,
       activities,
     });
+    setActiveTab(pendingTabAfterOnboarding || 'home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOnboardingDismiss = () => {
+    setIsOnboardingOpen(false);
     if (activeTab === 'landing') {
-      setActiveTab('home');
+      setActiveTab(pendingTabAfterOnboarding || 'home');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -497,7 +516,7 @@ export function App() {
     <div className="min-h-screen bg-[#f7f9fb] flex flex-col antialiased text-[#191c1e] font-sans selection:bg-[#99efe5] selection:text-[#006f67]">
       {/* Full Dedicated Landing Page Experience */}
       {activeTab === 'landing' ? (
-        <LandingPageView onLaunchApp={(tab) => setActiveTab(tab || 'home')} />
+        <LandingPageView onLaunchApp={handleLaunchApp} />
       ) : viewMode === 'mobile-preview' ? (
         <div className="flex-1 flex flex-col items-center justify-center p-0 md:p-6 bg-slate-900/90 min-h-screen">
           {/* Top banner to return to desktop */}
@@ -708,6 +727,7 @@ export function App() {
       <OnboardingModal
         isOpen={isOnboardingOpen}
         onComplete={handleOnboardingComplete}
+        onClose={handleOnboardingDismiss}
       />
 
       {/* Help & Guide Modal */}

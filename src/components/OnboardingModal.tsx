@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { UserProfile, HouseholdMember } from '../types';
 import { saveProfile, setOnboardingCompleted, validateProfileInput } from '../utils/profileStore';
-import { Sparkles, Home, CheckCircle2, User, MapPin, DollarSign, Users, Bell } from 'lucide-react';
+import { Sparkles, Home, CheckCircle2, User, MapPin, DollarSign, Users, X } from 'lucide-react';
 
 interface OnboardingModalProps {
   isOpen: boolean;
   onComplete: (profile: UserProfile) => void;
+  onClose?: () => void;
 }
 
-export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete }) => {
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComplete, onClose }) => {
+  const [step, setStep] = useState<1 | 2>(1);
 
   // Form inputs
   const [name, setName] = useState('');
@@ -26,10 +27,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
-
-  const handleStart = () => {
-    setStep(2);
-  };
 
   const handleAddMember = () => {
     if (!newMemberName.trim()) return;
@@ -57,7 +54,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
       return;
     }
 
-    setStep(3);
+    setStep(2);
   };
 
   const handleFinish = async () => {
@@ -75,7 +72,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
       onComplete(res.profile);
     } else {
       setErrorMessage(res.error || 'Failed to save household profile');
-      setStep(2);
+      setStep(1);
     }
   };
 
@@ -88,97 +85,57 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
         id="onboarding-container"
         className="bg-white rounded-2xl max-w-xl w-full p-6 sm:p-8 shadow-2xl border border-[#e2e8f0] space-y-6 relative overflow-hidden"
       >
-        {/* Progress Step Indicator */}
+        {/* Header & Step Indicator */}
         <div className="flex items-center justify-between pb-3 border-b border-gray-100">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-lg bg-[#0F766E]/10 flex items-center justify-center text-[#0F766E]">
               <Home className="w-4 h-4" />
             </span>
-            <span className="text-sm font-semibold text-[#0F172A]">HomeOps AI Setup</span>
+            <div>
+              <span className="text-sm font-semibold text-[#0F172A] block leading-tight">
+                HomeOps AI Setup
+              </span>
+              <span className="text-[11px] text-gray-500">
+                {step === 1 ? 'Step 1 of 2: Household Profile' : 'Step 2 of 2: Confirmation'}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
-            <span className={`w-2.5 h-2.5 rounded-full ${step >= 1 ? 'bg-[#0F766E]' : 'bg-gray-200'}`}></span>
-            <span className={`w-2.5 h-2.5 rounded-full ${step >= 2 ? 'bg-[#0F766E]' : 'bg-gray-200'}`}></span>
-            <span className={`w-2.5 h-2.5 rounded-full ${step >= 3 ? 'bg-[#0F766E]' : 'bg-gray-200'}`}></span>
-            <span className="ml-2 text-xs text-gray-400">Step {step} of 3</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-full ${step >= 1 ? 'bg-[#0F766E]' : 'bg-gray-200'}`}></span>
+              <span className={`w-2.5 h-2.5 rounded-full ${step >= 2 ? 'bg-[#0F766E]' : 'bg-gray-200'}`}></span>
+            </div>
+            {onClose && (
+              <button
+                id="btn-close-onboarding"
+                onClick={onClose}
+                className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition-colors cursor-pointer"
+                title="Close and explore demo"
+                aria-label="Close setup"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* STEP 1: WELCOME */}
+        {/* STEP 1: PERSONALIZATION FORM */}
         {step === 1 && (
-          <div id="onboarding-step-1" className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200">
-            <div className="space-y-2 text-left">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#F0FDFA] text-[#0F766E] text-xs font-semibold border border-[#CCFBF1]">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Intelligent Household Operations</span>
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight">
-                Welcome to HomeOps AI
-              </h2>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                Your private, local-first household assistant. Manage tasks, grocery replenishment,
-                recurring bills, and maintenance — preserved right in your browser.
-              </p>
-            </div>
-
-            <div className="bg-[#F8FAFC] p-4 sm:p-5 rounded-xl border border-gray-200/80 space-y-2.5">
-              <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                What HomeOps AI automates:
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-xs font-medium text-gray-700">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Chore & Task Priority</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Pantry & Inventory</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Auto Shopping Lists</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Bill Due-Date Alerts</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Appliance Maintenance</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-[#0F766E] shrink-0" />
-                  <span>Daily Action Briefings</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <button
-                id="onboarding-get-started-btn"
-                onClick={handleStart}
-                className="w-full py-3 px-5 bg-[#0F766E] hover:bg-[#115E59] active:scale-[0.99] text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Get Started</span>
-                <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: PROFILE & HOUSEHOLD */}
-        {step === 2 && (
           <form
-            id="onboarding-step-2"
+            id="onboarding-step-1-form"
             onSubmit={handleProfileSubmit}
-            className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200 max-h-[70vh] overflow-y-auto pr-1"
+            className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-200 max-h-[72vh] overflow-y-auto pr-1"
           >
             <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#F0FDFA] text-[#0F766E] text-xs font-semibold border border-[#CCFBF1]">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Personalize Your Home</span>
+              </div>
               <h2 className="text-xl font-bold text-[#0F172A] tracking-tight">
-                Let's personalize your HomeOps
+                Let's set up your HomeOps
               </h2>
               <p className="text-xs text-gray-500">
-                Enter your details to create your local household profile. Only your name is required.
+                Your records are stored securely in your browser's local database. Only your name is required.
               </p>
             </div>
 
@@ -211,6 +168,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     if (errorMessage) setErrorMessage(null);
                   }}
                   placeholder="e.g. Bikram"
+                  autoFocus
                   className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-[#0F172A] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E]/40 focus:border-[#0F766E]"
                 />
               </div>
@@ -236,7 +194,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               </div>
             </div>
 
-            {/* City (Optional) */}
+            {/* City & Currency */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label htmlFor="onboarding-city" className="block text-xs font-semibold text-gray-700">
@@ -257,7 +215,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 </div>
               </div>
 
-              {/* Currency */}
               <div className="space-y-1.5">
                 <label htmlFor="onboarding-currency" className="block text-xs font-semibold text-gray-700">
                   Currency for bills &amp; shopping
@@ -291,7 +248,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <button
                   type="button"
                   onClick={() => setNotificationPref('dashboard')}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center ${
+                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center cursor-pointer ${
                     notificationPref === 'dashboard'
                       ? 'border-[#0F766E] bg-[#F0FDFA] text-[#0F766E] font-bold shadow-xs'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -302,7 +259,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <button
                   type="button"
                   onClick={() => setNotificationPref('telegram')}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center ${
+                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center cursor-pointer ${
                     notificationPref === 'telegram'
                       ? 'border-[#0F766E] bg-[#F0FDFA] text-[#0F766E] font-bold shadow-xs'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -313,7 +270,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <button
                   type="button"
                   onClick={() => setNotificationPref('both')}
-                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center ${
+                  className={`py-2 px-2 text-xs font-medium rounded-lg border transition-all text-center cursor-pointer ${
                     notificationPref === 'both'
                       ? 'border-[#0F766E] bg-[#F0FDFA] text-[#0F766E] font-bold shadow-xs'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -335,7 +292,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                   <button
                     type="button"
                     onClick={() => setShowAddMember(true)}
-                    className="text-xs font-semibold text-[#0F766E] hover:underline"
+                    className="text-xs font-semibold text-[#0F766E] hover:underline cursor-pointer"
                   >
                     + Add member
                   </button>
@@ -353,7 +310,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                       <button
                         type="button"
                         onClick={() => handleRemoveMember(m.id)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
                       >
                         ×
                       </button>
@@ -384,14 +341,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     <button
                       type="button"
                       onClick={() => setShowAddMember(false)}
-                      className="px-2 py-1 text-xs text-gray-500"
+                      className="px-2 py-1 text-xs text-gray-500 cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleAddMember}
-                      className="px-3 py-1 bg-[#0F766E] text-white text-xs font-semibold rounded"
+                      className="px-3 py-1 bg-[#0F766E] text-white text-xs font-semibold rounded cursor-pointer"
                     >
                       Add
                     </button>
@@ -400,28 +357,33 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
               )}
             </div>
 
+            {/* Form Actions */}
             <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
-              >
-                Back
-              </button>
+              {onClose ? (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
+                >
+                  Explore Demo First
+                </button>
+              ) : (
+                <span />
+              )}
               <button
                 id="onboarding-continue-btn"
                 type="submit"
                 className="py-2.5 px-6 bg-[#0F766E] hover:bg-[#115E59] active:scale-[0.99] text-white rounded-xl text-sm font-semibold shadow-md transition-all cursor-pointer"
               >
-                Continue
+                Continue &rarr;
               </button>
             </div>
           </form>
         )}
 
-        {/* STEP 3: READY & COMPLETE */}
-        {step === 3 && (
-          <div id="onboarding-step-3" className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200 text-center">
+        {/* STEP 2: READY & COMPLETE */}
+        {step === 2 && (
+          <div id="onboarding-step-2" className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-200 text-center">
             <div className="w-16 h-16 rounded-2xl bg-[#F0FDFA] text-[#0F766E] flex items-center justify-center mx-auto border border-[#CCFBF1] shadow-xs">
               <CheckCircle2 className="w-8 h-8" />
             </div>
@@ -453,20 +415,35 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                 <span className="text-gray-500">Currency</span>
                 <span className="font-semibold text-gray-800">{currency}</span>
               </div>
+              {members.length > 0 && (
+                <div className="flex justify-between py-1 border-b border-gray-100">
+                  <span className="text-gray-500">Household Members</span>
+                  <span className="font-semibold text-gray-800">
+                    {members.map((m) => m.name).join(', ')}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-gray-500">Storage</span>
                 <span className="font-semibold text-emerald-600 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                  Local IndexedDB (No external database)
+                  Local IndexedDB (Private &amp; Offline-Ready)
                 </span>
               </div>
             </div>
 
-            <div>
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="px-4 py-2 text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
+              >
+                &larr; Back to Edit
+              </button>
               <button
                 id="onboarding-open-dashboard-btn"
                 onClick={handleFinish}
-                className="w-full py-3 px-5 bg-[#0F766E] hover:bg-[#115E59] active:scale-[0.99] text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="py-3 px-6 bg-[#0F766E] hover:bg-[#115E59] active:scale-[0.99] text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Open Dashboard</span>
                 <span className="material-symbols-outlined text-[18px]">dashboard</span>
@@ -478,3 +455,4 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
     </div>
   );
 };
+

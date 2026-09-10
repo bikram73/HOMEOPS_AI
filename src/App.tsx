@@ -50,13 +50,19 @@ import {
   downloadBackupFile,
   importBackupData,
 } from './utils/exportImport';
+import {
+  getStoredTasks,
+  saveStoredTasks,
+  clearStoredTasks,
+} from './utils/taskStore';
+import { recordActivityEvent } from './utils/activityStore';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<PageTab>('landing');
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile-preview'>('desktop');
 
-  // Application Data States
-  const [tasks, setTasks] = useState<TaskItem[]>(INITIAL_TASKS);
+  // Application Data States - initialized synchronously from browser LocalStorage / Cookies / Cache
+  const [tasks, setTasks] = useState<TaskItem[]>(() => getStoredTasks());
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(INITIAL_SHOPPING);
   const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS);
@@ -86,8 +92,8 @@ export function App() {
       const liveState = await api.getState();
       if (liveState) {
         if (liveState.tasks) {
-          setTasks(
-            liveState.tasks.map((t) => ({
+          setTasks((currentTasks) => {
+            const serverTasks = liveState.tasks.map((t) => ({
               id: t.id,
               title: t.title,
               subtitle: `${t.category} • ${t.dueDate}`,
@@ -97,8 +103,23 @@ export function App() {
               amount: t.amount,
               provider: t.provider,
               completed: t.completed,
-            }))
-          );
+            }));
+
+            // Preserve local user-added and user-completed tasks; merge in any external server tasks
+            const localById = new Map(currentTasks.map((t) => [t.id, t]));
+            const localByTitle = new Map(currentTasks.map((t) => [t.title.toLowerCase().trim(), t]));
+            const merged: TaskItem[] = [...currentTasks];
+
+            for (const st of serverTasks) {
+              const matched = localById.get(st.id) || localByTitle.get(st.title.toLowerCase().trim());
+              if (!matched) {
+                merged.push(st);
+              }
+            }
+
+            saveStoredTasks(merged);
+            return merged;
+          });
         }
         if (liveState.inventory) {
           setInventory(
@@ -187,28 +208,34 @@ export function App() {
         setChatHistory(persistedChat);
       }
 
-      if (persistedState && persistedState.tasks && persistedState.tasks.length > 0) {
+      // Hydrate tasks from Browser Storage (LocalStorage, Cookies, Cache)
+      const storedTasks = getStoredTasks();
+      if (storedTasks && storedTasks.length > 0) {
+        setTasks(storedTasks);
+      } else if (persistedState && persistedState.tasks && persistedState.tasks.length > 0) {
         setTasks(persistedState.tasks);
+        saveStoredTasks(persistedState.tasks);
+      }
+
+      if (persistedState) {
         if (persistedState.inventory?.length) setInventory(persistedState.inventory);
         if (persistedState.shopping?.length) setShoppingItems(persistedState.shopping);
         if (persistedState.bills?.length) setBills(persistedState.bills);
         if (persistedState.activities?.length) setActivities(persistedState.activities);
+      }
 
-        // Synchronize backend with restored data so Gemini / Caspian stay aware
-        try {
-          await api.syncStateWithServer({
-            tasks: persistedState.tasks as any,
-            inventory: persistedState.inventory as any,
-            shopping: persistedState.shopping as any,
-            bills: persistedState.bills as any,
-            activities: persistedState.activities as any,
-          });
-        } catch {
-          // graceful fallback
-        }
-      } else {
-        // First visit or initial load: sync from server and save initial state
-        await syncServerState();
+      // Synchronize backend with restored data so Gemini / Caspian stay aware
+      try {
+        const tasksToSync = storedTasks && storedTasks.length > 0 ? storedTasks : persistedState?.tasks;
+        await api.syncStateWithServer({
+          tasks: (tasksToSync || []) as any,
+          inventory: persistedState?.inventory as any,
+          shopping: persistedState?.shopping as any,
+          bills: persistedState?.bills as any,
+          activities: persistedState?.activities as any,
+        });
+      } catch {
+        // graceful fallback
       }
     };
 
@@ -270,8 +297,10 @@ export function App() {
     await clearProfile();
     await clearHouseholdState();
     await clearConversation();
+    await clearStoredTasks();
     setUserProfile(null);
     setTasks(INITIAL_TASKS);
+    saveStoredTasks(INITIAL_TASKS);
     setInventory(INITIAL_INVENTORY);
     setShoppingItems(INITIAL_SHOPPING);
     setBills(INITIAL_BILLS);
@@ -286,18 +315,40 @@ export function App() {
     setIsOnboardingOpen(true);
   };
 
-  // Handlers for Tasks
+  // Handlers for Tasks - Persisted immediately into Cookies, LocalStorage, Cache & IndexedDB
   const handleToggleTask = async (id: string) => {
     const target = tasks.find((t) => t.id === id);
-    const newStatus = !target?.completed;
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: newStatus } : t))
-    );
+    if (!target) return;
+    const newStatus = !target.completed;
+    const updated = tasks.map((t) => (t.id === id ? { ...t, completed: newStatus } : t));
+
+    // 1. Instantly update React state
+    setTasks(updated);
+
+    // 2. Instantly persist to Cookies, LocalStorage, Cache, and IndexedDB
+    saveStoredTasks(updated);
+
+    // 3. Log to Activity Calendar & Change History
+    recordActivityEvent({
+      type: 'task',
+      action: newStatus ? 'task_completed' : 'task_reopened',
+      title: newStatus ? `Completed task: ${target.title}` : `Reopened task: ${target.title}`,
+      description: newStatus ? 'Marked as completed' : 'Marked as active/pending',
+      source: 'user',
+      entityType: 'task',
+      entityId: id,
+      entityName: target.title,
+      before: { completed: target.completed },
+      after: { completed: newStatus },
+      diff: { field: 'completed', before: target.completed, after: newStatus },
+    });
+
+    // 4. Background server sync
     try {
       await api.toggleTask(id, newStatus);
-      syncServerState();
+      await api.syncStateWithServer({ tasks: updated as any });
     } catch (e) {
-      console.error(e);
+      console.warn('Server toggle sync fallback:', e);
     }
   };
 
@@ -307,7 +358,28 @@ export function App() {
       ...newTask,
       id: localId,
     };
-    setTasks((prev) => [item, ...prev]);
+    const updated = [item, ...tasks];
+
+    // 1. Instantly update React state
+    setTasks(updated);
+
+    // 2. Instantly persist to Cookies, LocalStorage, Cache, and IndexedDB
+    saveStoredTasks(updated);
+
+    // 3. Log to Activity Calendar & Change History
+    recordActivityEvent({
+      type: 'task',
+      action: 'task_created',
+      title: `Created task: ${newTask.title}`,
+      description: `Category: ${newTask.category} • Priority: ${newTask.priority} • Due: ${newTask.dueDate}`,
+      source: 'user',
+      entityType: 'task',
+      entityId: localId,
+      entityName: newTask.title,
+      after: item,
+    });
+
+    // 4. Background server sync
     try {
       await api.createTask({
         title: newTask.title,
@@ -317,19 +389,41 @@ export function App() {
         amount: newTask.amount,
         provider: newTask.provider,
       });
-      syncServerState();
+      await api.syncStateWithServer({ tasks: updated as any });
     } catch (e) {
-      console.error(e);
+      console.warn('Server create task sync fallback:', e);
     }
   };
 
   const handleDeleteTask = async (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    const target = tasks.find((t) => t.id === id);
+    const updated = tasks.filter((t) => t.id !== id);
+
+    // 1. Instantly update React state
+    setTasks(updated);
+
+    // 2. Instantly persist to Cookies, LocalStorage, Cache, and IndexedDB
+    saveStoredTasks(updated);
+
+    // 3. Log to Activity Calendar & Change History
+    if (target) {
+      recordActivityEvent({
+        type: 'task',
+        action: 'task_deleted',
+        title: `Deleted task: ${target.title}`,
+        source: 'user',
+        entityType: 'task',
+        entityId: id,
+        entityName: target.title,
+      });
+    }
+
+    // 4. Background server sync
     try {
       await api.deleteTask(id);
-      syncServerState();
+      await api.syncStateWithServer({ tasks: updated as any });
     } catch (e) {
-      console.error(e);
+      console.warn('Server delete task sync fallback:', e);
     }
   };
 

@@ -22,6 +22,10 @@ export const STORAGE_KEYS = {
   ONBOARDING_COMPLETED: 'homeops_onboarding_completed',
   USER_PROFILE: 'homeops_profile',
   PREFERENCES: 'homeops_preferences',
+  TASKS: 'homeops_tasks',
+  INVENTORY: 'homeops_inventory',
+  SHOPPING: 'homeops_shopping',
+  BILLS: 'homeops_bills',
 } as const;
 
 // Restricted key patterns that must NEVER be written to browser storage
@@ -238,9 +242,84 @@ export const localStore = {
           window.localStorage.removeItem(k);
         }
       });
+      cookieStore.remove('homeops_tasks_count');
+      cookieStore.remove('homeops_tasks_data');
+      appCache.remove('tasks');
       return true;
     } catch {
       return false;
     }
+  },
+};
+
+// --- Cookie Storage Safe Wrapper ---
+export const cookieStore = {
+  get: (name: string): string | null => {
+    try {
+      if (typeof document === 'undefined') return null;
+      const matches = document.cookie.match(
+        new RegExp('(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)')
+      );
+      return matches ? decodeURIComponent(matches[1]) : null;
+    } catch {
+      return null;
+    }
+  },
+  set: (name: string, value: string, days: number = 365): boolean => {
+    try {
+      if (typeof document === 'undefined') return false;
+      if (!sanitizeAndCheckSecurity(name, value)) return false;
+      // Guard against standard browser 4KB cookie limits (keep under 3.8KB)
+      const encoded = encodeURIComponent(value);
+      if (encoded.length > 3800) {
+        return false;
+      }
+      const date = new Date();
+      date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+      document.cookie = `${name}=${encoded};expires=${date.toUTCString()};path=/;SameSite=Lax`;
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  remove: (name: string): boolean => {
+    try {
+      if (typeof document === 'undefined') return false;
+      document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+      return true;
+    } catch {
+      return false;
+    }
+  },
+};
+
+// --- Cache (CacheStorage & Runtime Cache) Safe Wrapper ---
+const memoryCache = new Map<string, any>();
+
+export const appCache = {
+  get: <T>(key: string): T | null => {
+    return memoryCache.get(key) ?? null;
+  },
+  set: <T>(key: string, value: T): void => {
+    memoryCache.set(key, value);
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        window.caches.open('homeops-data-cache-v1').then((cache) => {
+          const blob = new Blob([JSON.stringify(value)], { type: 'application/json' });
+          const response = new Response(blob);
+          cache.put(new Request(`/local-cache/${key}`), response).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch {}
+  },
+  remove: (key: string): void => {
+    memoryCache.delete(key);
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        window.caches.open('homeops-data-cache-v1').then((cache) => {
+          cache.delete(new Request(`/local-cache/${key}`)).catch(() => {});
+        }).catch(() => {});
+      }
+    } catch {}
   },
 };

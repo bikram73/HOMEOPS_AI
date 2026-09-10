@@ -7,6 +7,7 @@ import { getProfile, saveProfile } from './profileStore';
 import { loadHouseholdState, saveHouseholdState } from './statePersistence';
 import { loadConversation, saveConversation } from './conversationStore';
 import { getAllActivities, saveAllActivities } from './activityStore';
+import { getStoredTasks, saveStoredTasks } from './taskStore';
 import { localStore, STORAGE_KEYS } from './storage';
 
 export async function generateBackupData(): Promise<StoredHouseholdData> {
@@ -23,6 +24,7 @@ export async function generateBackupData(): Promise<StoredHouseholdData> {
   const householdState = await loadHouseholdState();
   const activityEvents = await getAllActivities();
   const conversations = await loadConversation();
+  const storedTasks = getStoredTasks();
   const preferences = localStore.get<any>(STORAGE_KEYS.PREFERENCES) || {
     theme: 'light',
     currency: profile.currency || 'INR (₹)',
@@ -35,7 +37,7 @@ export async function generateBackupData(): Promise<StoredHouseholdData> {
     exportedAt: new Date().toISOString(),
     profile,
     preferences,
-    tasks: householdState?.tasks || [],
+    tasks: storedTasks.length > 0 ? storedTasks : householdState?.tasks || [],
     inventory: householdState?.inventory || [],
     shopping: householdState?.shopping || [],
     bills: householdState?.bills || [],
@@ -131,6 +133,9 @@ export async function importBackupData(jsonString: string): Promise<{ success: b
     // Save profile and mark onboarding as complete
     await saveProfile(profile);
     localStore.set(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
+
+    // Save tasks to LocalStorage, Cookies, Cache, and IndexedDB
+    saveStoredTasks(tasks);
 
     // Save household state to IndexedDB
     await saveHouseholdState({

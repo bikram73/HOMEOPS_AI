@@ -67,12 +67,18 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {/* Left Column: Task List Section */}
       <div className="flex-1 flex flex-col h-full overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-3xl font-bold text-[#0F172A] tracking-tight">Tasks</h2>
+        <div className="flex justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <h2 className="text-3xl font-bold text-[#0F172A] tracking-tight">Tasks</h2>
+            <p className="text-xs text-[#0F766E] font-medium flex items-center gap-1.5 mt-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              Persisted in browser storage, cookies & cache
+            </p>
+          </div>
           <button
             id="btn-add-task-modal-open"
             onClick={() => setShowAddModal(true)}
-            className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shadow-sm active:scale-98"
+            className="bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shadow-sm active:scale-98 shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Add Task

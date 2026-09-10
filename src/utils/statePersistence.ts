@@ -3,7 +3,7 @@
  * Saves and restores household tasks, inventory, shopping items, bills, maintenance,
  * and activity history to IndexedDB.
  */
-import { TaskItem, InventoryItem, ShoppingItem, BillItem, ActivityItem } from '../types';
+import { TaskItem, InventoryItem, ShoppingItem, BillItem, ActivityItem, ActivityEvent } from '../types';
 import { idbGet, idbSet, idbDelete, STORES } from './storage';
 
 export interface PersistedHouseholdState {
@@ -13,6 +13,7 @@ export interface PersistedHouseholdState {
   bills: BillItem[];
   maintenance?: any[];
   activities: ActivityItem[];
+  activityEvents?: ActivityEvent[];
   lastSavedAt: string;
 }
 
@@ -25,6 +26,7 @@ export async function saveHouseholdState(state: {
   bills: BillItem[];
   maintenance?: any[];
   activities: ActivityItem[];
+  activityEvents?: ActivityEvent[];
 }): Promise<boolean> {
   try {
     const payload: PersistedHouseholdState = {
@@ -34,6 +36,7 @@ export async function saveHouseholdState(state: {
       bills: state.bills || [],
       maintenance: state.maintenance || [],
       activities: state.activities || [],
+      activityEvents: state.activityEvents || [],
       lastSavedAt: new Date().toISOString(),
     };
 

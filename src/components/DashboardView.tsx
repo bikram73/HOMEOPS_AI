@@ -101,8 +101,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        {/* Action Buttons Toolbar */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Action Buttons Toolbar - Hidden per user instruction */}
+        <div id="dashboard-header-action-toolbar" className="hidden">
           {/* What Should I Do Now Signature Trigger */}
           <button
             id="btn-what-should-i-do-now"

@@ -7,7 +7,28 @@ import {
   MaintenanceTask,
   ActivityLog,
   AnalyticsData,
+  ActivityEvent,
+  ActivitySource,
+  ActivityType,
 } from './types';
+
+// Helper functions for dates & times
+export function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function formatLocalTime(d: Date = new Date()): string {
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+export function getRelativeDateString(daysOffset: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  return getLocalDateString(d);
+}
 
 // In-Memory Ephemeral State (Hackathon MVP: session-based, no external database required)
 class StateManager {
@@ -270,6 +291,174 @@ class StateManager {
           timestamp: Date.now() - 7200000,
         },
       ],
+      activityEvents: [
+        {
+          id: 'ACT-1725981234567',
+          type: 'ai',
+          action: 'ai_task_created',
+          title: 'Task created by HomeOps AI',
+          description: 'Clean water filter reverse-osmosis pre-membrane',
+          timestamp: `${getLocalDateString()}T16:10:00.000Z`,
+          date: getLocalDateString(),
+          time: '04:10 PM',
+          source: 'ai',
+          entityType: 'task',
+          entityId: 'task-5',
+          entityName: 'Clean water filter',
+          after: { title: 'Clean water filter', priority: 'medium' },
+        },
+        {
+          id: 'ACT-1725981234566',
+          type: 'bill',
+          action: 'bill_paid',
+          title: 'Electricity bill marked as paid',
+          description: 'City Power & Light settled via Telegram',
+          timestamp: `${getLocalDateString()}T14:30:00.000Z`,
+          date: getLocalDateString(),
+          time: '02:30 PM',
+          source: 'telegram',
+          entityType: 'bill',
+          entityId: 'bill-1',
+          entityName: 'Electricity Bill',
+          before: { status: 'Unpaid', amount: '₹1,250' },
+          after: { status: 'Paid', amount: '₹1,250' },
+          diff: { field: 'status', before: 'Unpaid', after: 'Paid', unit: '₹1,250' },
+        },
+        {
+          id: 'ACT-1725981234565',
+          type: 'automation',
+          action: 'auto_restock_added',
+          title: 'Added to shopping list',
+          description: 'Jasmine Rice automatically queued due to low stock threshold',
+          timestamp: `${getLocalDateString()}T11:05:00.000Z`,
+          date: getLocalDateString(),
+          time: '11:05 AM',
+          source: 'automation',
+          entityType: 'shopping',
+          entityName: 'Rice',
+          after: { quantity: '1 bag (5 kg)', category: 'Pantry' },
+        },
+        {
+          id: 'ACT-1725981234564',
+          type: 'inventory',
+          action: 'inventory_level_updated',
+          title: 'Inventory updated: Rice',
+          description: 'Rice level decreased from 2 kg to 0.5 kg',
+          timestamp: `${getLocalDateString()}T10:20:00.000Z`,
+          date: getLocalDateString(),
+          time: '10:20 AM',
+          source: 'user',
+          entityType: 'inventory',
+          entityId: 'inv-1',
+          entityName: 'Jasmine Rice',
+          before: '2 kg',
+          after: '0.5 kg',
+          diff: { field: 'quantity', before: '2 kg', after: '0.5 kg', unit: 'kg' },
+        },
+        {
+          id: 'ACT-1725981234563',
+          type: 'task',
+          action: 'task_completed',
+          title: 'Completed: Clean kitchen',
+          description: 'Kitchen countertops, stove burners, and sink disinfected',
+          timestamp: `${getLocalDateString()}T09:15:00.000Z`,
+          date: getLocalDateString(),
+          time: '09:15 AM',
+          source: 'user',
+          entityType: 'task',
+          entityId: 'task-4',
+          entityName: 'Clean kitchen',
+          before: { completed: false },
+          after: { completed: true },
+        },
+        {
+          id: 'ACT-1725981234562',
+          type: 'shopping',
+          action: 'shopping_item_added',
+          title: 'Shopping Item Added',
+          description: 'Whole Milk — 2 packets',
+          timestamp: `${getRelativeDateString(-1)}T16:30:00.000Z`,
+          date: getRelativeDateString(-1),
+          time: '04:30 PM',
+          source: 'user',
+          entityType: 'shopping',
+          entityName: 'Whole Milk',
+          after: { quantity: '2 packets', category: 'Dairy' },
+        },
+        {
+          id: 'ACT-1725981234561',
+          type: 'maintenance',
+          action: 'maintenance_completed',
+          title: 'Washing machine maintenance completed',
+          description: 'Lint filter cleaned & drum sterilization cycle run',
+          timestamp: `${getRelativeDateString(-1)}T11:00:00.000Z`,
+          date: getRelativeDateString(-1),
+          time: '11:00 AM',
+          source: 'user',
+          entityType: 'maintenance',
+          entityId: 'maint-washing-machine',
+          entityName: 'Washing Machine Service',
+          before: { status: 'Pending' },
+          after: { status: 'Completed' },
+        },
+        {
+          id: 'ACT-1725981234560',
+          type: 'inventory',
+          action: 'inventory_critical_detected',
+          title: 'Critical stock detected: Laundry Detergent',
+          description: 'Detergent level dropped below 20% threshold',
+          timestamp: `${getRelativeDateString(-1)}T08:45:00.000Z`,
+          date: getRelativeDateString(-1),
+          time: '08:45 AM',
+          source: 'automation',
+          entityType: 'inventory',
+          entityName: 'Laundry Detergent',
+          before: '45%',
+          after: '18%',
+          diff: { field: 'capacity', before: '45%', after: '18%', unit: '%' },
+        },
+        {
+          id: 'ACT-1725981234559',
+          type: 'telegram',
+          action: 'telegram_task_created',
+          title: 'Task created via Telegram',
+          description: '"Buy fresh vegetables on way back"',
+          timestamp: `${getRelativeDateString(-2)}T18:20:00.000Z`,
+          date: getRelativeDateString(-2),
+          time: '06:20 PM',
+          source: 'telegram',
+          entityType: 'task',
+          entityName: 'Buy vegetables',
+          after: { title: 'Buy fresh vegetables', priority: 'high' },
+        },
+        {
+          id: 'ACT-1725981234558',
+          type: 'bill',
+          action: 'bill_created',
+          title: 'New bill registered: Internet Fiber',
+          description: 'Monthly broadband invoice ₹1,499 registered with due date in 5 days',
+          timestamp: `${getRelativeDateString(-2)}T10:00:00.000Z`,
+          date: getRelativeDateString(-2),
+          time: '10:00 AM',
+          source: 'system',
+          entityType: 'bill',
+          entityName: 'Internet Fiber',
+          after: { amount: '₹1,499', dueDate: 'Due in 5 days' },
+        },
+        {
+          id: 'ACT-1725981234557',
+          type: 'ai',
+          action: 'ai_inventory_optimized',
+          title: 'AI weekly replenishment plan created',
+          description: 'Analyzed weekly depletion velocity across 14 household pantry staples',
+          timestamp: `${getRelativeDateString(-3)}T14:15:00.000Z`,
+          date: getRelativeDateString(-3),
+          time: '02:15 PM',
+          source: 'ai',
+          entityType: 'system',
+          entityName: 'Pantry Optimization Plan',
+        },
+      ],
       analytics: {
         activeUsers: 18,
         messages: 642,
@@ -298,7 +487,8 @@ class StateManager {
     priority: Task['priority'] = 'medium',
     dueDate: string = 'Today',
     amount?: string,
-    provider?: string
+    provider?: string,
+    source: ActivitySource = 'user'
   ): Task {
     const newTask: Task = {
       id: `task-${Date.now()}`,
@@ -313,35 +503,86 @@ class StateManager {
     };
     this.state.tasks.unshift(newTask);
     this.state.analytics.tasksCreated++;
-    this.recordActivity('New Task Created', title, 'assignment');
+    this.recordActivityEvent({
+      type: 'task',
+      action: 'task_created',
+      title: `Task created: ${title}`,
+      description: `Category: ${category} • Priority: ${priority} • Due: ${dueDate}`,
+      source,
+      entityType: 'task',
+      entityId: newTask.id,
+      entityName: title,
+      after: newTask,
+    });
     return newTask;
   }
 
-  public updateTask(id: string, updates: Partial<Task>): Task | null {
+  public updateTask(id: string, updates: Partial<Task>, source: ActivitySource = 'user'): Task | null {
     const task = this.state.tasks.find((t) => t.id === id || t.title.toLowerCase().includes(id.toLowerCase()));
     if (!task) return null;
+    const prev = { ...task };
     Object.assign(task, updates);
+    this.recordActivityEvent({
+      type: 'task',
+      action: 'task_updated',
+      title: `Task updated: ${task.title}`,
+      description: Object.keys(updates).join(', '),
+      source,
+      entityType: 'task',
+      entityId: task.id,
+      entityName: task.title,
+      before: prev,
+      after: task,
+    });
     return task;
   }
 
-  public completeTask(idOrTitle: string, completed: boolean = true): Task | null {
+  public completeTask(idOrTitle: string, completed: boolean = true, source: ActivitySource = 'user'): Task | null {
     const task = this.state.tasks.find(
       (t) => t.id === idOrTitle || t.title.toLowerCase().includes(idOrTitle.toLowerCase())
     );
     if (!task) return null;
+    const prev = task.completed;
     task.completed = completed;
     if (completed) {
       this.state.analytics.tasksCompleted++;
-      this.recordActivity('Task Completed', `✓ ${task.title}`, 'check_circle');
     }
+    this.recordActivityEvent({
+      type: 'task',
+      action: completed ? 'task_completed' : 'task_reopened',
+      title: completed ? `Completed: ${task.title}` : `Reopened: ${task.title}`,
+      description: completed ? 'Marked as completed' : 'Marked as active',
+      source,
+      entityType: 'task',
+      entityId: task.id,
+      entityName: task.title,
+      before: { completed: prev },
+      after: { completed },
+    });
     return task;
   }
 
-  public deleteTask(idOrTitle: string): boolean {
+  public deleteTask(idOrTitle: string, source: ActivitySource = 'user'): boolean {
+    const task = this.state.tasks.find(
+      (t) => t.id === idOrTitle || t.title.toLowerCase().includes(idOrTitle.toLowerCase())
+    );
     const initialLength = this.state.tasks.length;
     this.state.tasks = this.state.tasks.filter(
       (t) => t.id !== idOrTitle && !t.title.toLowerCase().includes(idOrTitle.toLowerCase())
     );
+    if (task && this.state.tasks.length < initialLength) {
+      this.recordActivityEvent({
+        type: 'task',
+        action: 'task_deleted',
+        title: `Task deleted: ${task.title}`,
+        source,
+        entityType: 'task',
+        entityId: task.id,
+        entityName: task.title,
+        before: task,
+      });
+      return true;
+    }
     return this.state.tasks.length < initialLength;
   }
 
@@ -351,7 +592,8 @@ class StateManager {
     quantity: number = 100,
     unit: string = 'unit',
     status?: InventoryItem['status'],
-    category: string = 'General'
+    category: string = 'General',
+    source: ActivitySource = 'user'
   ): InventoryItem {
     const computedStatus: InventoryItem['status'] =
       status || (quantity <= 20 ? 'critical' : quantity <= 35 ? 'low' : 'good');
@@ -360,10 +602,25 @@ class StateManager {
       (i) => i.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
+      const prevQty = existing.quantity;
+      const prevStatus = existing.status;
       existing.quantity = quantity;
       existing.status = computedStatus;
+      this.recordActivityEvent({
+        type: 'inventory',
+        action: 'inventory_level_updated',
+        title: `Inventory updated: ${existing.name}`,
+        description: `Quantity changed from ${prevQty}% to ${quantity}%`,
+        source,
+        entityType: 'inventory',
+        entityId: existing.id,
+        entityName: existing.name,
+        before: `${prevQty}% (${prevStatus})`,
+        after: `${quantity}% (${computedStatus})`,
+        diff: { field: 'quantity', before: prevQty, after: quantity, unit: '%' },
+      });
       if (computedStatus === 'low' || computedStatus === 'critical') {
-        this.addShoppingItem(existing.name, '1 unit', existing.category);
+        this.addShoppingItem(existing.name, '1 unit', existing.category, 'automation');
       }
       return existing;
     }
@@ -379,10 +636,20 @@ class StateManager {
       lastRestocked: 'Just now',
     };
     this.state.inventory.push(newItem);
-    this.recordActivity('Inventory Added', `${name} (${quantity}%)`, 'inventory');
+    this.recordActivityEvent({
+      type: 'inventory',
+      action: 'inventory_added',
+      title: `Inventory added: ${name}`,
+      description: `Starting level: ${quantity}% (${computedStatus})`,
+      source,
+      entityType: 'inventory',
+      entityId: newItem.id,
+      entityName: name,
+      after: { quantity, status: computedStatus },
+    });
 
     if (computedStatus === 'low' || computedStatus === 'critical') {
-      this.addShoppingItem(newItem.name, '1 unit', newItem.category);
+      this.addShoppingItem(newItem.name, '1 unit', newItem.category, 'automation');
     }
 
     return newItem;
@@ -391,12 +658,16 @@ class StateManager {
   public updateInventory(
     nameOrId: string,
     quantity?: number,
-    status?: InventoryItem['status']
+    status?: InventoryItem['status'],
+    source: ActivitySource = 'user'
   ): InventoryItem | null {
     const item = this.state.inventory.find(
       (i) => i.id === nameOrId || i.name.toLowerCase().includes(nameOrId.toLowerCase())
     );
     if (!item) return null;
+
+    const prevQty = item.quantity;
+    const prevStatus = item.status;
 
     if (quantity !== undefined) {
       item.quantity = Math.max(0, Math.min(100, quantity));
@@ -408,16 +679,34 @@ class StateManager {
     }
     if (status) item.status = status;
 
+    this.recordActivityEvent({
+      type: 'inventory',
+      action: 'inventory_level_updated',
+      title: `Inventory updated: ${item.name}`,
+      description: `Level adjusted from ${prevQty}% to ${item.quantity}% (${item.status})`,
+      source,
+      entityType: 'inventory',
+      entityId: item.id,
+      entityName: item.name,
+      before: `${prevQty}% (${prevStatus})`,
+      after: `${item.quantity}% (${item.status})`,
+      diff: { field: 'quantity', before: prevQty, after: item.quantity, unit: '%' },
+    });
+
     if (item.status === 'low' || item.status === 'critical') {
-      this.addShoppingItem(item.name, '1 unit', item.category);
+      this.addShoppingItem(item.name, '1 unit', item.category, 'automation');
     }
 
-    this.recordActivity('Inventory Level Updated', `${item.name}: ${item.quantity}% (${item.status})`, 'shelves');
     return item;
   }
 
   // --- Shopping Methods ---
-  public addShoppingItem(name: string, quantity: string = '1 item', category?: string): ShoppingItem {
+  public addShoppingItem(
+    name: string,
+    quantity: string = '1 item',
+    category?: string,
+    source: ActivitySource = 'user'
+  ): ShoppingItem {
     const existing = this.state.shopping.find(
       (s) => s.name.toLowerCase().trim() === name.toLowerCase().trim() && !s.completed
     );
@@ -433,32 +722,70 @@ class StateManager {
     };
     this.state.shopping.unshift(newItem);
     this.state.analytics.shoppingItems++;
-    this.recordActivity('Shopping Item Added', name, 'shopping_bag');
+    this.recordActivityEvent({
+      type: 'shopping',
+      action: 'shopping_item_added',
+      title: `Added to shopping list: ${name}`,
+      description: `Qty: ${quantity} • Category: ${category || 'Household'}`,
+      source,
+      entityType: 'shopping',
+      entityId: newItem.id,
+      entityName: name,
+      after: { quantity, category: newItem.category },
+    });
     return newItem;
   }
 
-  public completeShoppingItem(idOrName: string, completed: boolean = true): ShoppingItem | null {
+  public completeShoppingItem(idOrName: string, completed: boolean = true, source: ActivitySource = 'user'): ShoppingItem | null {
     const item = this.state.shopping.find(
       (s) => s.id === idOrName || s.name.toLowerCase().includes(idOrName.toLowerCase())
     );
     if (!item) return null;
     item.completed = completed;
-    if (completed) {
-      this.recordActivity('Shopping Item Checked', item.name, 'done_all');
-    }
+    this.recordActivityEvent({
+      type: 'shopping',
+      action: completed ? 'shopping_item_completed' : 'shopping_item_reopened',
+      title: completed ? `Purchased: ${item.name}` : `Re-added: ${item.name}`,
+      description: completed ? 'Marked as bought' : 'Moved back to list',
+      source,
+      entityType: 'shopping',
+      entityId: item.id,
+      entityName: item.name,
+      after: { completed },
+    });
     return item;
   }
 
-  public removeShoppingItem(idOrName: string): boolean {
+  public removeShoppingItem(idOrName: string, source: ActivitySource = 'user'): boolean {
+    const item = this.state.shopping.find(
+      (s) => s.id === idOrName || s.name.toLowerCase().includes(idOrName.toLowerCase())
+    );
     const initialLength = this.state.shopping.length;
     this.state.shopping = this.state.shopping.filter(
       (s) => s.id !== idOrName && !s.name.toLowerCase().includes(idOrName.toLowerCase())
     );
+    if (item && this.state.shopping.length < initialLength) {
+      this.recordActivityEvent({
+        type: 'shopping',
+        action: 'shopping_item_removed',
+        title: `Removed from shopping list: ${item.name}`,
+        source,
+        entityType: 'shopping',
+        entityId: item.id,
+        entityName: item.name,
+      });
+      return true;
+    }
     return this.state.shopping.length < initialLength;
   }
 
   // --- Bill Methods ---
-  public addBill(name: string, amount: number = 0, dueDate: string = 'Upcoming'): Bill {
+  public addBill(
+    name: string,
+    amount: number = 0,
+    dueDate: string = 'Upcoming',
+    source: ActivitySource = 'user'
+  ): Bill {
     const newBill: Bill = {
       id: `bill-${Date.now()}`,
       name,
@@ -469,22 +796,44 @@ class StateManager {
       icon: 'receipt',
     };
     this.state.bills.unshift(newBill);
-    this.recordActivity('New Bill Added', `${name} ($${amount})`, 'receipt');
+    this.recordActivityEvent({
+      type: 'bill',
+      action: 'bill_created',
+      title: `New bill registered: ${name}`,
+      description: `Amount: $${amount} • Due: ${dueDate}`,
+      source,
+      entityType: 'bill',
+      entityId: newBill.id,
+      entityName: name,
+      after: newBill,
+    });
     return newBill;
   }
 
-  public markBillPaid(idOrName?: string, paid: boolean = true): Bill | null {
+  public markBillPaid(idOrName?: string, paid: boolean = true, source: ActivitySource = 'user'): Bill | null {
     if (!idOrName || typeof idOrName !== 'string' || !idOrName.trim()) return null;
     const target = idOrName.trim().toLowerCase();
     const bill = this.state.bills.find(
       (b) => b.id.toLowerCase() === target || b.name.toLowerCase().includes(target)
     );
     if (!bill) return null;
+    const prevPaid = bill.paid;
     bill.paid = paid;
     bill.dueCategory = paid ? 'Paid' : 'Due Soon';
-    if (paid) {
-      this.recordActivity('Bill Paid & Archived', `${bill.name} ($${bill.amount})`, 'paid');
-    }
+
+    this.recordActivityEvent({
+      type: 'bill',
+      action: paid ? 'bill_paid' : 'bill_marked_unpaid',
+      title: paid ? `Bill marked as paid: ${bill.name}` : `Bill marked unpaid: ${bill.name}`,
+      description: `Amount: $${bill.amount} • Due date: ${bill.dueDate}`,
+      source,
+      entityType: 'bill',
+      entityId: bill.id,
+      entityName: bill.name,
+      before: { paid: prevPaid, amount: bill.amount },
+      after: { paid, amount: bill.amount },
+      diff: { field: 'paid', before: prevPaid, after: paid, unit: `$${bill.amount}` },
+    });
     return bill;
   }
 
@@ -493,7 +842,8 @@ class StateManager {
     title: string,
     category: string = 'General',
     dueDate: string = 'Due in 7 days',
-    provider?: string
+    provider?: string,
+    source: ActivitySource = 'user'
   ): MaintenanceTask {
     const newTask: MaintenanceTask = {
       id: `maint-${Date.now()}`,
@@ -504,17 +854,43 @@ class StateManager {
       provider,
     };
     this.state.maintenance.unshift(newTask);
-    this.recordActivity('Maintenance Scheduled', title, 'build');
+    this.recordActivityEvent({
+      type: 'maintenance',
+      action: 'maintenance_scheduled',
+      title: `Maintenance scheduled: ${title}`,
+      description: `Category: ${category} • Due: ${dueDate}${provider ? ` • Provider: ${provider}` : ''}`,
+      source,
+      entityType: 'maintenance',
+      entityId: newTask.id,
+      entityName: title,
+      after: newTask,
+    });
     return newTask;
   }
 
-  public completeMaintenanceTask(idOrTitle: string, status: MaintenanceTask['status'] = 'completed'): MaintenanceTask | null {
+  public completeMaintenanceTask(
+    idOrTitle: string,
+    status: MaintenanceTask['status'] = 'completed',
+    source: ActivitySource = 'user'
+  ): MaintenanceTask | null {
     const item = this.state.maintenance.find(
       (m) => m.id === idOrTitle || m.title.toLowerCase().includes(idOrTitle.toLowerCase())
     );
     if (!item) return null;
+    const prevStatus = item.status;
     item.status = status;
-    this.recordActivity('Maintenance Updated', `${item.title} (${status})`, 'construction');
+    this.recordActivityEvent({
+      type: 'maintenance',
+      action: 'maintenance_completed',
+      title: `Maintenance updated: ${item.title}`,
+      description: `Status changed from ${prevStatus} to ${status}`,
+      source,
+      entityType: 'maintenance',
+      entityId: item.id,
+      entityName: item.title,
+      before: { status: prevStatus },
+      after: { status },
+    });
     return item;
   }
 
@@ -533,6 +909,224 @@ class StateManager {
     }
   }
 
+  public recordActivityEvent(event: {
+    type: ActivityType;
+    action: string;
+    title: string;
+    description?: string;
+    source?: ActivitySource;
+    entityType?: 'task' | 'inventory' | 'shopping' | 'bill' | 'maintenance' | 'system';
+    entityId?: string;
+    entityName?: string;
+    before?: unknown;
+    after?: unknown;
+    diff?: { field?: string; before?: unknown; after?: unknown; unit?: string };
+    metadata?: Record<string, unknown>;
+    timestamp?: string;
+    date?: string;
+    time?: string;
+  }): ActivityEvent {
+    const now = new Date();
+    const timestamp = event.timestamp || now.toISOString();
+    const date = event.date || getLocalDateString(now);
+    const time = event.time || formatLocalTime(now);
+    const id = `ACT-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
+    const fullEvent: ActivityEvent = {
+      id,
+      type: event.type,
+      action: event.action,
+      title: event.title,
+      description: event.description,
+      timestamp,
+      date,
+      time,
+      source: event.source || 'user',
+      entityType: event.entityType,
+      entityId: event.entityId,
+      entityName: event.entityName,
+      before: event.before,
+      after: event.after,
+      diff: event.diff,
+      metadata: event.metadata,
+    };
+
+    if (!Array.isArray(this.state.activityEvents)) {
+      this.state.activityEvents = [];
+    }
+
+    this.state.activityEvents.unshift(fullEvent);
+    if (this.state.activityEvents.length > 3000) {
+      this.state.activityEvents.pop();
+    }
+
+    // Also update legacy activities list
+    this.recordActivity(event.title, event.description || event.action);
+
+    return fullEvent;
+  }
+
+  // --- Historical Activity Queries ---
+  public getActivitiesByDate(date: string): ActivityEvent[] {
+    return (this.state.activityEvents || []).filter((a) => a.date === date);
+  }
+
+  public getActivitiesByDateRange(startDate: string, endDate: string): ActivityEvent[] {
+    return (this.state.activityEvents || []).filter(
+      (a) => a.date >= startDate && a.date <= endDate
+    );
+  }
+
+  public getActivitiesByCategory(type: string, limit: number = 50): ActivityEvent[] {
+    const events = (this.state.activityEvents || []).filter((a) => a.type === type);
+    return events.slice(0, limit);
+  }
+
+  public getLastActivityForEntity(entityNameOrId: string): ActivityEvent | null {
+    const target = entityNameOrId.toLowerCase().trim();
+    const event = (this.state.activityEvents || []).find((a) => {
+      if (a.entityId && a.entityId.toLowerCase() === target) return true;
+      if (a.entityName && a.entityName.toLowerCase().includes(target)) return true;
+      if (a.title.toLowerCase().includes(target)) return true;
+      return false;
+    });
+    return event || null;
+  }
+
+  public getUpcomingEvents(daysAhead: number = 30): Array<{
+    id: string;
+    date: string;
+    title: string;
+    subtitle: string;
+    type: 'bill' | 'maintenance' | 'task';
+    amount?: string | number;
+    priority?: string;
+    status?: string;
+    sourceEntityId: string;
+  }> {
+    const results: Array<any> = [];
+
+    // Derive upcoming from bills
+    for (const b of this.state.bills) {
+      if (!b.paid) {
+        const targetDate = new Date();
+        const lowerDue = (b.dueDate || '').toLowerCase();
+        if (lowerDue.includes('tomorrow')) {
+          targetDate.setDate(targetDate.getDate() + 1);
+        } else if (lowerDue.includes('5 days')) {
+          targetDate.setDate(targetDate.getDate() + 5);
+        } else if (lowerDue.includes('7 days') || lowerDue.includes('week')) {
+          targetDate.setDate(targetDate.getDate() + 7);
+        } else {
+          targetDate.setDate(targetDate.getDate() + 3);
+        }
+        results.push({
+          id: `upcoming-bill-${b.id}`,
+          date: getLocalDateString(targetDate),
+          title: `Bill Due: ${b.name}`,
+          subtitle: `$${b.amount} • Due ${b.dueDate}`,
+          type: 'bill',
+          amount: b.amount,
+          status: 'unpaid',
+          sourceEntityId: b.id,
+        });
+      }
+    }
+
+    // Derive upcoming from maintenance
+    for (const m of this.state.maintenance) {
+      if (m.status !== 'completed') {
+        const targetDate = new Date();
+        const lowerDue = (m.dueDate || '').toLowerCase();
+        if (lowerDue.includes('tomorrow')) {
+          targetDate.setDate(targetDate.getDate() + 1);
+        } else if (lowerDue.includes('6 days') || lowerDue.includes('7 days')) {
+          targetDate.setDate(targetDate.getDate() + 6);
+        } else if (lowerDue.includes('14 days') || lowerDue.includes('2 weeks')) {
+          targetDate.setDate(targetDate.getDate() + 14);
+        } else {
+          targetDate.setDate(targetDate.getDate() + 4);
+        }
+        results.push({
+          id: `upcoming-maint-${m.id}`,
+          date: getLocalDateString(targetDate),
+          title: `Maintenance: ${m.title}`,
+          subtitle: `${m.category} • ${m.dueDate}`,
+          type: 'maintenance',
+          status: m.status,
+          sourceEntityId: m.id,
+        });
+      }
+    }
+
+    // Derive upcoming from tasks
+    for (const t of this.state.tasks) {
+      if (!t.completed && t.dueDate && !t.dueDate.toLowerCase().includes('today')) {
+        const targetDate = new Date();
+        const lowerDue = t.dueDate.toLowerCase();
+        if (lowerDue.includes('tomorrow')) {
+          targetDate.setDate(targetDate.getDate() + 1);
+        } else if (lowerDue.includes('friday')) {
+          targetDate.setDate(targetDate.getDate() + 2);
+        } else {
+          targetDate.setDate(targetDate.getDate() + 3);
+        }
+        results.push({
+          id: `upcoming-task-${t.id}`,
+          date: getLocalDateString(targetDate),
+          title: `Task Due: ${t.title}`,
+          subtitle: `${t.priority.toUpperCase()} priority • ${t.category}`,
+          type: 'task',
+          priority: t.priority,
+          status: 'pending',
+          sourceEntityId: t.id,
+        });
+      }
+    }
+
+    return results.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  public getActivitySummary(period: 'today' | 'yesterday' | 'week' | 'month' = 'today'): {
+    period: string;
+    totalEvents: number;
+    breakdown: Record<string, number>;
+    sources: Record<string, number>;
+    recentEvents: ActivityEvent[];
+  } {
+    const todayStr = getLocalDateString();
+    const yesterdayStr = getRelativeDateString(-1);
+    const weekAgoStr = getRelativeDateString(-7);
+    const monthAgoStr = getRelativeDateString(-30);
+
+    let filtered = this.state.activityEvents || [];
+    if (period === 'today') {
+      filtered = filtered.filter((a) => a.date === todayStr);
+    } else if (period === 'yesterday') {
+      filtered = filtered.filter((a) => a.date === yesterdayStr);
+    } else if (period === 'week') {
+      filtered = filtered.filter((a) => a.date >= weekAgoStr);
+    } else if (period === 'month') {
+      filtered = filtered.filter((a) => a.date >= monthAgoStr);
+    }
+
+    const breakdown: Record<string, number> = {};
+    const sources: Record<string, number> = {};
+
+    for (const event of filtered) {
+      breakdown[event.type] = (breakdown[event.type] || 0) + 1;
+      sources[event.source] = (sources[event.source] || 0) + 1;
+    }
+
+    return {
+      period,
+      totalEvents: filtered.length,
+      breakdown,
+      sources,
+      recentEvents: filtered.slice(0, 15),
+    };
+  }
+
   public incrementMessageCount() {
     this.state.analytics.messages++;
   }
@@ -548,6 +1142,7 @@ class StateManager {
     bills?: Bill[];
     maintenance?: MaintenanceTask[];
     activities?: ActivityLog[];
+    activityEvents?: ActivityEvent[];
   }): HomeState {
     if (Array.isArray(clientState.tasks) && clientState.tasks.length > 0) {
       this.state.tasks = clientState.tasks;
@@ -566,6 +1161,9 @@ class StateManager {
     }
     if (Array.isArray(clientState.activities) && clientState.activities.length > 0) {
       this.state.activities = clientState.activities;
+    }
+    if (Array.isArray(clientState.activityEvents) && clientState.activityEvents.length > 0) {
+      this.state.activityEvents = clientState.activityEvents;
     }
     return this.getState();
   }

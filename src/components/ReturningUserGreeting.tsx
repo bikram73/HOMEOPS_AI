@@ -41,17 +41,17 @@ export const ReturningUserGreeting: React.FC<ReturningUserGreetingProps> = ({
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight flex items-center gap-2">
-              <span>Welcome back, {userName}</span>
-              <span className="text-xl sm:text-2xl inline-block" role="img" aria-label="Welcome">
-                👋
+              <span>{homeName} Overview</span>
+              <span className="text-xl sm:text-2xl inline-block" role="img" aria-label="Home">
+                🏡
               </span>
             </h2>
             <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1]">
-              {homeName}
+              {userName}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Your household records are loaded from your private browser storage. Here is your current status:
+            Household records loaded from your private browser storage. Here is your current status:
           </p>
         </div>
 

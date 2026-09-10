@@ -494,4 +494,127 @@ export const tools = {
       actionType: 'weekly_plan_generated',
     };
   },
+
+  // --- Activity Calendar & Change History Tools ---
+  getActivityForDate: (args: { date?: string }): ToolResult => {
+    let targetDate = '';
+    const raw = (args.date || 'today').toLowerCase().trim();
+
+    const today = new Date();
+    const formatYMD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    if (raw === 'today') {
+      targetDate = formatYMD(today);
+    } else if (raw === 'yesterday') {
+      const y = new Date(today);
+      y.setDate(y.getDate() - 1);
+      targetDate = formatYMD(y);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      targetDate = raw;
+    } else {
+      targetDate = formatYMD(today);
+    }
+
+    const events = stateManager.getActivitiesByDate(targetDate);
+
+    if (events.length === 0) {
+      return {
+        success: true,
+        message: `No changes or actions were recorded on ${targetDate}.`,
+        data: { date: targetDate, count: 0, events: [] },
+        actionType: 'activity_by_date_queried',
+      };
+    }
+
+    return {
+      success: true,
+      message: `Found ${events.length} household actions and changes on ${targetDate}.`,
+      data: {
+        date: targetDate,
+        count: events.length,
+        events: events.map((e) => ({
+          time: e.time,
+          title: e.title,
+          description: e.description,
+          type: e.type,
+          source: e.source,
+          entity: e.entityName,
+          before: e.before,
+          after: e.after,
+          diff: e.diff,
+        })),
+      },
+      actionType: 'activity_by_date_queried',
+    };
+  },
+
+  getRecentChanges: (args?: { limit?: number; category?: string }): ToolResult => {
+    const limit = args?.limit || 10;
+    let events = stateManager.getState().activityEvents || [];
+
+    if (args?.category) {
+      const cat = args.category.toLowerCase().trim();
+      events = events.filter((e) => e.type.toLowerCase() === cat || e.entityType?.toLowerCase() === cat);
+    }
+
+    const sliced = events.slice(0, limit);
+
+    return {
+      success: true,
+      message: `Retrieved ${sliced.length} recent household activity events.`,
+      data: sliced,
+      actionType: 'recent_changes_retrieved',
+    };
+  },
+
+  getChangeHistoryForEntity: (args: { entityName: string }): ToolResult => {
+    if (!args.entityName) {
+      return { success: false, message: 'Entity name or search term is required' };
+    }
+    const target = args.entityName.toLowerCase().trim();
+    const events = (stateManager.getState().activityEvents || []).filter((e) => {
+      if (e.entityName && e.entityName.toLowerCase().includes(target)) return true;
+      if (e.title.toLowerCase().includes(target)) return true;
+      if (e.description && e.description.toLowerCase().includes(target)) return true;
+      if (e.entityId && e.entityId.toLowerCase() === target) return true;
+      return false;
+    });
+
+    if (events.length === 0) {
+      return {
+        success: true,
+        message: `No recorded changes found for "${args.entityName}".`,
+        data: { entityName: args.entityName, events: [] },
+        actionType: 'entity_history_queried',
+      };
+    }
+
+    return {
+      success: true,
+      message: `Found ${events.length} recorded change events for "${args.entityName}". Most recent was on ${events[0].date} at ${events[0].time || ''}.`,
+      data: {
+        entityName: args.entityName,
+        mostRecent: events[0],
+        allEvents: events,
+      },
+      actionType: 'entity_history_queried',
+    };
+  },
+
+  getUpcomingSchedule: (args?: { daysAhead?: number }): ToolResult => {
+    const days = args?.daysAhead || 14;
+    const upcoming = stateManager.getUpcomingEvents(days);
+
+    return {
+      success: true,
+      message: `Found ${upcoming.length} upcoming scheduled household events (bills, maintenance, tasks).`,
+      data: upcoming,
+      actionType: 'upcoming_schedule_queried',
+    };
+  },
 };

@@ -49,7 +49,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       setEditCity(profile?.city || '');
       setEditCurrency(profile?.currency || 'INR (₹)');
       setEditError(null);
-      setIsEditing(false);
+      setIsEditing(true); // Open directly in editable mode per user request
       setSaveSuccess(false);
       setShowUserMenu(true);
     } else {

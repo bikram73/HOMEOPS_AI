@@ -64,6 +64,44 @@ export interface MaintenanceTask {
   notes?: string;
 }
 
+export type ActivityType =
+  | 'task'
+  | 'inventory'
+  | 'shopping'
+  | 'bill'
+  | 'maintenance'
+  | 'ai'
+  | 'automation'
+  | 'telegram';
+
+export type ActivitySource = 'user' | 'ai' | 'automation' | 'telegram' | 'system';
+
+export interface ActivityChangeDiff {
+  field?: string;
+  before?: unknown;
+  after?: unknown;
+  unit?: string;
+}
+
+export interface ActivityEvent {
+  id: string;
+  type: ActivityType;
+  action: string;
+  title: string;
+  description?: string;
+  timestamp: string; // ISO string
+  date: string; // YYYY-MM-DD
+  time?: string;
+  source: ActivitySource;
+  entityType?: 'task' | 'inventory' | 'shopping' | 'bill' | 'maintenance' | 'system';
+  entityId?: string;
+  entityName?: string;
+  before?: unknown;
+  after?: unknown;
+  diff?: ActivityChangeDiff;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ActivityLog {
   id: string;
   title: string;
@@ -90,5 +128,6 @@ export interface HomeState {
   bills: Bill[];
   maintenance: MaintenanceTask[];
   activities: ActivityLog[];
+  activityEvents: ActivityEvent[];
   analytics: AnalyticsData;
 }

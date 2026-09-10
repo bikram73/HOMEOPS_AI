@@ -17,6 +17,7 @@ import { InventoryView } from './components/InventoryView';
 import { ShoppingBillsView } from './components/ShoppingBillsView';
 import { AssistantView } from './components/AssistantView';
 import { MaintenanceView } from './components/MaintenanceView';
+import { CalendarView } from './components/CalendarView';
 import { MobileDashboardView } from './components/MobileDashboardView';
 import { LandingPageView } from './components/LandingPageView';
 import { SettingsModal, HelpModal } from './components/SettingsModal';
@@ -580,6 +581,17 @@ export function App() {
               />
             )}
             {activeTab === 'maintenance' && <MaintenanceView />}
+            {activeTab === 'calendar' && (
+              <CalendarView
+                tasks={tasks}
+                bills={bills}
+                setActiveTab={setActiveTab}
+                onAskAiAboutDate={(dateStr) => {
+                  setActiveTab('assistant');
+                  handleSendChatMessage(`What changes occurred in our home on ${dateStr}?`);
+                }}
+              />
+            )}
           </div>
         </div>
       ) : (
@@ -680,6 +692,18 @@ export function App() {
               )}
 
               {activeTab === 'maintenance' && <MaintenanceView />}
+
+              {activeTab === 'calendar' && (
+                <CalendarView
+                  tasks={tasks}
+                  bills={bills}
+                  setActiveTab={setActiveTab}
+                  onAskAiAboutDate={(dateStr) => {
+                    setActiveTab('assistant');
+                    handleSendChatMessage(`What changes occurred in our home on ${dateStr}?`);
+                  }}
+                />
+              )}
             </main>
           </div>
         </div>

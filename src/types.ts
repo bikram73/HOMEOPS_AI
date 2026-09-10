@@ -6,9 +6,60 @@ export type PageTab =
   | 'shopping'
   | 'bills'
   | 'maintenance'
+  | 'calendar'
   | 'assistant'
   | 'settings'
   | 'help';
+
+export type ActivityType =
+  | 'task'
+  | 'inventory'
+  | 'shopping'
+  | 'bill'
+  | 'maintenance'
+  | 'ai'
+  | 'automation'
+  | 'telegram';
+
+export type ActivitySource = 'user' | 'ai' | 'automation' | 'telegram' | 'system';
+
+export interface ActivityChangeDiff {
+  field?: string;
+  before?: unknown;
+  after?: unknown;
+  unit?: string;
+}
+
+export interface ActivityEvent {
+  id: string; // e.g. "ACT-1725981234567"
+  type: ActivityType;
+  action: string;
+  title: string;
+  description?: string;
+  timestamp: string; // ISO 8601 string
+  date: string; // YYYY-MM-DD
+  time?: string; // Formatted 12-hr time string (e.g. "10:20 AM")
+  source: ActivitySource;
+  entityType?: 'task' | 'inventory' | 'shopping' | 'bill' | 'maintenance' | 'system';
+  entityId?: string;
+  entityName?: string;
+  before?: unknown;
+  after?: unknown;
+  diff?: ActivityChangeDiff;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CalendarUpcomingEvent {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  subtitle: string;
+  type: 'bill' | 'maintenance' | 'task';
+  amount?: string | number;
+  priority?: string;
+  status?: string;
+  sourceEntityId: string;
+}
 
 export type TaskPriority = 'High' | 'Medium' | 'Low';
 
@@ -113,6 +164,7 @@ export interface StoredHouseholdData {
   bills: BillItem[];
   maintenance?: any[];
   activities: ActivityItem[];
+  activityEvents?: ActivityEvent[];
   conversations?: ChatMessage[];
 }
 

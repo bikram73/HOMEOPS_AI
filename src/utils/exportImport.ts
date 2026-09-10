@@ -6,6 +6,7 @@ import { StoredHouseholdData, UserProfile } from '../types';
 import { getProfile, saveProfile } from './profileStore';
 import { loadHouseholdState, saveHouseholdState } from './statePersistence';
 import { loadConversation, saveConversation } from './conversationStore';
+import { getAllActivities, saveAllActivities } from './activityStore';
 import { localStore, STORAGE_KEYS } from './storage';
 
 export async function generateBackupData(): Promise<StoredHouseholdData> {
@@ -20,6 +21,7 @@ export async function generateBackupData(): Promise<StoredHouseholdData> {
   };
 
   const householdState = await loadHouseholdState();
+  const activityEvents = await getAllActivities();
   const conversations = await loadConversation();
   const preferences = localStore.get<any>(STORAGE_KEYS.PREFERENCES) || {
     theme: 'light',
@@ -39,6 +41,7 @@ export async function generateBackupData(): Promise<StoredHouseholdData> {
     bills: householdState?.bills || [],
     maintenance: householdState?.maintenance || [],
     activities: householdState?.activities || [],
+    activityEvents: activityEvents || [],
     conversations: conversations || [],
   };
 
@@ -108,6 +111,7 @@ export function validateBackupData(data: any): { valid: boolean; error?: string;
     bills: Array.isArray(data.bills) ? data.bills : [],
     maintenance: Array.isArray(data.maintenance) ? data.maintenance : [],
     activities: Array.isArray(data.activities) ? data.activities : [],
+    activityEvents: Array.isArray(data.activityEvents) ? data.activityEvents : undefined,
     conversations: Array.isArray(data.conversations) ? data.conversations : [],
   };
 
@@ -122,7 +126,7 @@ export async function importBackupData(jsonString: string): Promise<{ success: b
       return { success: false, error: validation.error || 'Validation failed' };
     }
 
-    const { profile, tasks, inventory, shopping, bills, maintenance, activities, conversations } = validation.parsed;
+    const { profile, tasks, inventory, shopping, bills, maintenance, activities, activityEvents, conversations } = validation.parsed;
 
     // Save profile and mark onboarding as complete
     await saveProfile(profile);
@@ -136,7 +140,13 @@ export async function importBackupData(jsonString: string): Promise<{ success: b
       bills,
       maintenance,
       activities,
+      activityEvents,
     });
+
+    // Save activity events if present in backup
+    if (activityEvents && activityEvents.length > 0) {
+      await saveAllActivities(activityEvents);
+    }
 
     // Save conversations if present
     if (conversations && conversations.length > 0) {

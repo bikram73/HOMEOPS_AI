@@ -212,6 +212,52 @@ const toolDeclarations: FunctionDeclaration[] = [
       properties: {},
     },
   },
+  {
+    name: 'getActivityForDate',
+    description: 'Queries household change history and actions for a specific date (e.g. "today", "yesterday", or "YYYY-MM-DD"). Use this whenever the user asks "What did I change today?", "What happened yesterday?", or asks about actions on a specific date.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        date: {
+          type: Type.STRING,
+          description: 'Date to query (e.g. "today", "yesterday", or "YYYY-MM-DD")',
+        },
+      },
+      required: ['date'],
+    },
+  },
+  {
+    name: 'getRecentChanges',
+    description: 'Returns the most recent household activities and change history records across tasks, inventory, bills, shopping, and maintenance.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        limit: { type: Type.NUMBER, description: 'Number of recent activities to retrieve (default 10)' },
+        category: { type: Type.STRING, description: 'Optional category filter: task, inventory, shopping, bill, maintenance, ai, automation, telegram' },
+      },
+    },
+  },
+  {
+    name: 'getChangeHistoryForEntity',
+    description: 'Finds the historical audit trail and past changes for a specific item, task, bill, or appliance (e.g., "rice", "electricity", "washing machine"). Answers "When did I update rice?" or "Which day did I pay electricity?".',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        entityName: { type: Type.STRING, description: 'Name of the item, task, bill, or appliance to search history for' },
+      },
+      required: ['entityName'],
+    },
+  },
+  {
+    name: 'getUpcomingSchedule',
+    description: 'Returns upcoming scheduled household deadlines, including upcoming bills, maintenance cycles, and due tasks.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        daysAhead: { type: Type.NUMBER, description: 'Days ahead to look into future (default 14)' },
+      },
+    },
+  },
 ];
 
 export interface AgentProcessResult {
@@ -238,6 +284,152 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
   const toolsExecuted: { toolName: string; args: any; result: ToolResult }[] = [];
 
   stateManager.incrementMessageCount();
+
+  // 0a. Historical Activity: "What did I change today?", "What did I do today?", "Changes today", "What changed today?"
+  if (
+    msg.includes('change today') ||
+    msg.includes('changed today') ||
+    msg.includes('complete today') ||
+    msg.includes('completed today') ||
+    msg.includes('do today') ||
+    msg.includes('activity today') ||
+    msg.includes('what happened today') ||
+    msg.includes('actions today')
+  ) {
+    const actResult = tools.getActivityForDate({ date: 'today' });
+    toolsExecuted.push({ toolName: 'getActivityForDate', args: { date: 'today' }, result: actResult });
+    const events = actResult.data?.events || [];
+    if (events.length === 0) {
+      return {
+        response: `No changes or actions were recorded for **today** (${actResult.data?.date}). You can make changes anytime and HomeOps will automatically log them in your Activity Calendar.`,
+        toolsExecuted,
+      };
+    }
+    let response = `Here are the **${events.length} changes and actions recorded today** (${actResult.data?.date}):\n\n`;
+    events.forEach((e: any, idx: number) => {
+      const sourceTag = e.source === 'automation' ? '🤖 [Automation]' : e.source === 'telegram' ? '📱 [Telegram]' : '👤 [User]';
+      response += `${idx + 1}. **${e.time || ''}** — ${sourceTag} **${e.title}**\n   ${e.description || ''}\n`;
+      if (e.diff?.before !== undefined && e.diff?.after !== undefined) {
+        response += `   *Change:* ${e.diff.before} ➔ ${e.diff.after}\n`;
+      }
+    });
+    return { response, toolsExecuted };
+  }
+
+  // 0b. Historical Activity: "What did I change yesterday?", "What did I complete yesterday?"
+  if (
+    msg.includes('change yesterday') ||
+    msg.includes('changed yesterday') ||
+    msg.includes('complete yesterday') ||
+    msg.includes('completed yesterday') ||
+    msg.includes('do yesterday') ||
+    msg.includes('activity yesterday') ||
+    msg.includes('what happened yesterday')
+  ) {
+    const actResult = tools.getActivityForDate({ date: 'yesterday' });
+    toolsExecuted.push({ toolName: 'getActivityForDate', args: { date: 'yesterday' }, result: actResult });
+    const events = actResult.data?.events || [];
+    if (events.length === 0) {
+      return {
+        response: `No changes or actions were recorded for **yesterday** (${actResult.data?.date}).`,
+        toolsExecuted,
+      };
+    }
+    let response = `Here is what changed **yesterday** (${actResult.data?.date}):\n\n`;
+    events.forEach((e: any, idx: number) => {
+      const sourceTag = e.source === 'automation' ? '🤖 [Automation]' : e.source === 'telegram' ? '📱 [Telegram]' : '👤 [User]';
+      response += `${idx + 1}. **${e.time || ''}** — ${sourceTag} **${e.title}**\n   ${e.description || ''}\n`;
+    });
+    return { response, toolsExecuted };
+  }
+
+  // 0c. Entity Change History: "When did I update the rice inventory?", "Which day did I pay the electricity bill?", "When was the washing machine maintenance completed?"
+  if (
+    msg.startsWith('when did') ||
+    msg.startsWith('which day did') ||
+    msg.startsWith('when was') ||
+    msg.includes('when did i update') ||
+    msg.includes('when did i change') ||
+    msg.includes('when did i buy') ||
+    msg.includes('when did i pay') ||
+    msg.includes('history of')
+  ) {
+    // Extract entity name
+    let entityCandidate = msg
+      .replace(/when did i update the|when did i update|which day did i pay the|which day did i pay|when was the|when was|when did i change the|when did i change|when did i complete the|when did i complete|history of the|history of/gi, '')
+      .replace(/inventory|bill|maintenance|task|item|\?/gi, '')
+      .trim();
+
+    if (entityCandidate) {
+      const histResult = tools.getChangeHistoryForEntity({ entityName: entityCandidate });
+      toolsExecuted.push({ toolName: 'getChangeHistoryForEntity', args: { entityName: entityCandidate }, result: histResult });
+      const events = histResult.data?.allEvents || [];
+      if (events.length === 0) {
+        return {
+          response: `I searched your household activity logs, but found **no recorded changes or actions** for "${entityCandidate}".`,
+          toolsExecuted,
+        };
+      }
+      const mostRecent = events[0];
+      let response = `The most recent recorded update for **${entityCandidate}** occurred on **${mostRecent.date}** at **${mostRecent.time || ''}**:\n\n`;
+      response += `• **${mostRecent.title}** (${mostRecent.source} source)\n  ${mostRecent.description || ''}\n`;
+      if (mostRecent.diff?.before !== undefined && mostRecent.diff?.after !== undefined) {
+        response += `  *Previous value:* ${mostRecent.diff.before} ➔ *New value:* ${mostRecent.diff.after}\n`;
+      }
+      if (events.length > 1) {
+        response += `\nThere are **${events.length} total events** for this item in your activity history.`;
+      }
+      return { response, toolsExecuted };
+    }
+  }
+
+  // 0d. Automation audit: "What did HomeOps automatically change?", "What automations ran?"
+  if (
+    msg.includes('automatically change') ||
+    msg.includes('automations ran') ||
+    msg.includes('automation history') ||
+    msg.includes('what did homeops change')
+  ) {
+    const actResult = tools.getRecentChanges({ limit: 10, category: 'automation' });
+    toolsExecuted.push({ toolName: 'getRecentChanges', args: { limit: 10, category: 'automation' }, result: actResult });
+    const events = actResult.data || [];
+    if (events.length === 0) {
+      return {
+        response: 'No automated changes have been recorded yet. Automatic actions (such as auto-replenishment shopping triggers) will be logged here.',
+        toolsExecuted,
+      };
+    }
+    let response = `Here are the latest **automated changes** executed by HomeOps AI:\n\n`;
+    events.forEach((e: any, idx: number) => {
+      response += `${idx + 1}. **${e.date} ${e.time || ''}** — 🤖 **${e.title}**\n   ${e.description || ''}\n`;
+    });
+    return { response, toolsExecuted };
+  }
+
+  // 0e. Upcoming schedule: "What is upcoming?", "Upcoming schedule", "Show my calendar"
+  if (
+    msg.includes('upcoming schedule') ||
+    msg.includes('upcoming bills') ||
+    msg.includes('upcoming maintenance') ||
+    msg.includes('what is scheduled') ||
+    msg.includes('what is coming up')
+  ) {
+    const schedResult = tools.getUpcomingSchedule({ daysAhead: 14 });
+    toolsExecuted.push({ toolName: 'getUpcomingSchedule', args: { daysAhead: 14 }, result: schedResult });
+    const upcoming = schedResult.data || [];
+    if (upcoming.length === 0) {
+      return {
+        response: 'You have no upcoming bills or maintenance due in the next 14 days! Everything is up to date.',
+        toolsExecuted,
+      };
+    }
+    let response = `Here is your **upcoming household schedule (next 14 days)**:\n\n`;
+    upcoming.forEach((item: any) => {
+      const typeBadge = item.type === 'bill' ? '💳 [Bill]' : item.type === 'maintenance' ? '🔧 [Maintenance]' : '📋 [Task]';
+      response += `• **${item.date}** — ${typeBadge} **${item.title}** (${item.subtitle})\n`;
+    });
+    return { response, toolsExecuted };
+  }
 
   // 1. "What should I do now?" / "What should I do right now?" / "What to do?"
   if (
@@ -670,11 +862,21 @@ export async function processUserMessage(userMessage: string, history: any[] = [
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const systemInstruction = `You are HomeOps, an intelligent household operations agent.
-Your responsibility is to help users organize, monitor, and execute their everyday household responsibilities.
-You have tools to create, update, complete, and prioritize tasks, inventory, shopping items, bills, and maintenance schedules.
-Never invent information. Always call the corresponding tool when a user asks to change, view, or prioritize household state.
-Keep your answers concise, practical, authoritative, and action-oriented.`;
+    const systemInstruction = `You are HomeOps, an intelligent household operations agent with complete audit logging and an Activity Calendar & Change History system.
+Your responsibility is to help users organize, monitor, execute, and review their everyday household responsibilities and historical activity.
+You have tools to:
+1. Create, update, complete, and prioritize tasks, inventory, shopping items, bills, and maintenance schedules.
+2. Query historical activity records:
+   - "getActivityForDate(date)": ALWAYS call when user asks "What did I change today?", "What did I complete yesterday?", "What happened on [date]?", or any date-specific audit question.
+   - "getChangeHistoryForEntity(entityName)": ALWAYS call when user asks "When did I update [item]?", "Which day did I pay [bill]?", "When was [maintenance] completed?", etc.
+   - "getRecentChanges(limit, category)": Retrieve latest activity events.
+   - "getUpcomingSchedule(daysAhead)": Retrieve upcoming bills, maintenance cycles, and due tasks.
+
+CRITICAL ANTI-HALLUCINATION RULES:
+- Never guess or invent dates, actions, quantities, or previous states.
+- Always use the activity tools to verify what actually occurred.
+- If a date or entity has no recorded activity, explicitly state: "No changes or actions were recorded on [date]."
+- Ground your answer directly in the returned tool data.`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',

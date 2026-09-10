@@ -9,12 +9,13 @@
  */
 
 const DB_NAME = 'homeops_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export const STORES = {
   PROFILE: 'profile',
   HOUSEHOLD_STATE: 'household_state',
   CONVERSATIONS: 'conversations',
+  ACTIVITIES: 'activities',
 } as const;
 
 export const STORAGE_KEYS = {
@@ -75,6 +76,9 @@ async function getDB(): Promise<IDBDatabase | null> {
         }
         if (!db.objectStoreNames.contains(STORES.CONVERSATIONS)) {
           db.createObjectStore(STORES.CONVERSATIONS);
+        }
+        if (!db.objectStoreNames.contains(STORES.ACTIVITIES)) {
+          db.createObjectStore(STORES.ACTIVITIES);
         }
       };
 

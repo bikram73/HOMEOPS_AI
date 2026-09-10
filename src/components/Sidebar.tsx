@@ -20,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'shopping', label: 'Shopping', icon: 'shopping_cart' },
     { id: 'bills', label: 'Bills', icon: 'payments' },
     { id: 'maintenance', label: 'Maintenance', icon: 'handyman' },
+    { id: 'calendar', label: 'Activity Calendar', icon: 'calendar_month' },
     { id: 'assistant', label: 'AI Assistant', icon: 'smart_toy' },
   ];
 

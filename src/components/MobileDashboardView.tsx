@@ -166,6 +166,13 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
           <span className="text-[10px] font-medium">Shopping</span>
         </button>
         <button
+          onClick={() => setActiveTab('calendar')}
+          className="flex flex-col items-center justify-center w-full h-full text-gray-500 hover:text-[#006a63]"
+        >
+          <span className="material-symbols-outlined text-[22px] mb-0.5">calendar_month</span>
+          <span className="text-[10px] font-medium">Calendar</span>
+        </button>
+        <button
           onClick={() => setActiveTab('assistant')}
           className="flex flex-col items-center justify-center w-full h-full text-gray-500 hover:text-[#006a63]"
         >

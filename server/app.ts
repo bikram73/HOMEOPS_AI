@@ -233,5 +233,50 @@ export function createExpressApp(): Express {
     res.json(stateManager.getState().analytics);
   });
 
+  // Activity Calendar & Change History Endpoints
+  app.get('/api/activities', (req: Request, res: Response) => {
+    const { date, startDate, endDate, type, limit } = req.query;
+
+    if (date && typeof date === 'string') {
+      return res.json(stateManager.getActivitiesByDate(date));
+    }
+
+    if (startDate && endDate && typeof startDate === 'string' && typeof endDate === 'string') {
+      return res.json(stateManager.getActivitiesByDateRange(startDate, endDate));
+    }
+
+    if (type && typeof type === 'string') {
+      const parsedLimit = limit ? parseInt(limit as string, 10) : 50;
+      return res.json(stateManager.getActivitiesByCategory(type, parsedLimit));
+    }
+
+    const state = stateManager.getState();
+    res.json(state.activityEvents || []);
+  });
+
+  app.post('/api/activities', (req: Request, res: Response) => {
+    const { activity } = req.body;
+    if (!activity || !activity.title) {
+      return res.status(400).json({ error: 'Valid activity object required' });
+    }
+    const recorded = stateManager.recordActivityEvent(activity);
+    res.status(201).json(recorded);
+  });
+
+  app.get('/api/calendar/events', (_req: Request, res: Response) => {
+    const state = stateManager.getState();
+    const upcoming = stateManager.getUpcomingEvents();
+    res.json({
+      activities: state.activityEvents || [],
+      upcoming,
+    });
+  });
+
+  app.get('/api/calendar/summary', (req: Request, res: Response) => {
+    const period = (req.query.period as any) || 'today';
+    const summary = stateManager.getActivitySummary(period);
+    res.json(summary);
+  });
+
   return app;
 }

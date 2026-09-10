@@ -218,7 +218,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         bills={bills}
         onOpenWhatNowModal={onOpenWhatNowModal || (() => {})}
         onOpenBriefingModal={onOpenBriefingModal || (() => {})}
-        overrideHour={timeOverride}
       />
 
       {/* Quick Stats Row */}

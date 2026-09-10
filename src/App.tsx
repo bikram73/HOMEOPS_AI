@@ -613,6 +613,10 @@ export function App() {
               onOpenNotifications={() => setIsNotificationsOpen(true)}
               unreadCount={2}
               profile={userProfile}
+              onUpdateProfile={async (updated) => {
+                setUserProfile(updated);
+                await saveProfile(updated);
+              }}
             />
 
             {/* View Routers */}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { PageTab } from '../types';
 import { Sun, AlertTriangle, CheckSquare, ShoppingCart, Wrench, ArrowRight, X, Sparkles } from 'lucide-react';
+import { getTimeGreeting } from '../utils/timeGreeting';
 
 interface BriefingModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface BriefingModalProps {
 export const BriefingModal: React.FC<BriefingModalProps> = ({ isOpen, onClose, onNavigate }) => {
   const [briefing, setBriefing] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const timeInfo = getTimeGreeting();
 
   useEffect(() => {
     if (isOpen) {
@@ -33,12 +35,15 @@ export const BriefingModal: React.FC<BriefingModalProps> = ({ isOpen, onClose, o
         <div className="bg-gradient-to-r from-[#006a63] to-[#00504a] text-white p-6 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-full bg-white/20 backdrop-blur-xs">
-                <Sun className="w-6 h-6 text-amber-300 fill-amber-300" />
+              <div className="p-2.5 rounded-full bg-white/20 backdrop-blur-xs text-xl">
+                {timeInfo.emoji}
               </div>
               <div>
-                <h3 className="text-xl font-bold">Good Morning 👋</h3>
-                <p className="text-xs text-[#99efe5] font-medium">Daily Home Operations Briefing</p>
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  <span>{timeInfo.greeting}</span>
+                  <span className="text-lg">👋</span>
+                </h3>
+                <p className="text-xs text-[#99efe5] font-medium">{timeInfo.label} Home Operations Briefing</p>
               </div>
             </div>
             <button

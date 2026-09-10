@@ -1,6 +1,7 @@
 import React from 'react';
 import { UserProfile, TaskItem, InventoryItem, ShoppingItem, BillItem } from '../types';
 import { Sparkles, CheckCircle2, AlertTriangle, ShoppingCart, Calendar, Wrench } from 'lucide-react';
+import { getTimeGreeting } from '../utils/timeGreeting';
 
 interface ReturningUserGreetingProps {
   profile: UserProfile | null;
@@ -11,6 +12,7 @@ interface ReturningUserGreetingProps {
   maintenance?: any[];
   onOpenWhatNowModal: () => void;
   onOpenBriefingModal: () => void;
+  overrideHour?: number;
 }
 
 export const ReturningUserGreeting: React.FC<ReturningUserGreetingProps> = ({
@@ -22,6 +24,7 @@ export const ReturningUserGreeting: React.FC<ReturningUserGreetingProps> = ({
   maintenance = [],
   onOpenWhatNowModal,
   onOpenBriefingModal,
+  overrideHour,
 }) => {
   const pendingTasksCount = tasks.filter((t) => !t.completed).length;
   const lowStockCount = inventory.filter((i) => i.availability <= 30).length;
@@ -31,6 +34,7 @@ export const ReturningUserGreeting: React.FC<ReturningUserGreetingProps> = ({
 
   const userName = profile?.name || 'Homeowner';
   const homeName = profile?.householdName || 'My Home';
+  const timeInfo = getTimeGreeting(overrideHour);
 
   return (
     <div
@@ -39,16 +43,22 @@ export const ReturningUserGreeting: React.FC<ReturningUserGreetingProps> = ({
     >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight">
-              Welcome back, {userName} 👋
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[#0F172A] tracking-tight flex items-center gap-2">
+              <span>{timeInfo.returningGreeting}, {userName}</span>
+              <span className="text-xl sm:text-2xl inline-block" role="img" aria-label={timeInfo.label}>
+                {timeInfo.emoji}
+              </span>
             </h2>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${timeInfo.periodBadgeClass}`}>
+              <span>{timeInfo.label}</span>
+            </span>
             <span className="hidden sm:inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#F0FDFA] text-[#0F766E] border border-[#CCFBF1]">
               {homeName}
             </span>
           </div>
           <p className="text-xs sm:text-sm text-gray-500 mt-1">
-            Your household records are loaded from your private browser storage. Here is your current status:
+            Your household records are loaded from your private browser storage. {timeInfo.subtext}
           </p>
         </div>
 

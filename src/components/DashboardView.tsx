@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, UserProfile } from '../types';
 import { HERO_IMAGE_URL } from '../data/mockData';
 import { Sparkles, Calendar, Zap, MessageSquare } from 'lucide-react';
 import { ReturningUserGreeting } from './ReturningUserGreeting';
+import { getTimeGreeting } from '../utils/timeGreeting';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
@@ -37,6 +38,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [isAiCardDismissed, setIsAiCardDismissed] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+  const [timeOverride, setTimeOverride] = useState<number | undefined>(undefined);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Update real-time clock every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const timeInfo = getTimeGreeting(timeOverride);
 
   // Priority tasks filter
   const priorityTasks = tasks.slice(0, 4);
@@ -72,22 +85,85 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Page Header with Action Buttons */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] tracking-tight">
-              Good morning{userProfile?.name ? `, ${userProfile.name}` : ''} 👋
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="text-3xl md:text-4xl font-bold text-[#0F172A] tracking-tight flex items-center gap-2">
+              <span>{timeInfo.greeting}{userProfile?.name ? `, ${userProfile.name}` : ''}</span>
+              <span className="text-2xl md:text-3xl inline-block" role="img" aria-label={timeInfo.label}>
+                {timeInfo.emoji}
+              </span>
             </h2>
+            <span
+              className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${timeInfo.periodBadgeClass}`}
+            >
+              {timeInfo.label}
+            </span>
             <button
               onClick={onOpenBriefingModal}
               className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#99efe5]/60 text-[#006f67] hover:bg-[#99efe5] transition-colors flex items-center gap-1 cursor-pointer"
-              title="Open Daily Home Briefing"
+              title={`Open ${timeInfo.label} Home Briefing`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Daily Briefing</span>
+              <span>{timeInfo.label} Briefing</span>
             </button>
           </div>
           <p className="text-base md:text-lg text-gray-500 mt-1">
-            {userProfile?.householdName ? `${userProfile.householdName} • ` : ''}Here's what needs your attention today across the household.
+            {userProfile?.householdName ? `${userProfile.householdName} • ` : ''}{timeInfo.subtext}
           </p>
+
+          {/* Time-of-Day Quick Switcher / Status */}
+          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
+            <span className="text-[11px] text-gray-400 font-medium">Time mode:</span>
+            <div className="inline-flex p-0.5 bg-gray-100 rounded-lg border border-gray-200/80">
+              <button
+                type="button"
+                onClick={() => setTimeOverride(undefined)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                  timeOverride === undefined
+                    ? 'bg-white text-[#0F766E] font-bold shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+                title="Automatic based on local device clock"
+              >
+                Auto ({currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeOverride(8)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                  timeOverride === 8
+                    ? 'bg-white text-amber-700 font-bold shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+                title="Preview Morning greeting (8 AM)"
+              >
+                🌅 Morning
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeOverride(19)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                  timeOverride === 19
+                    ? 'bg-white text-indigo-700 font-bold shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+                title="Preview Evening greeting (7 PM)"
+              >
+                🌆 Evening
+              </button>
+              <button
+                type="button"
+                onClick={() => setTimeOverride(23)}
+                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
+                  timeOverride === 23
+                    ? 'bg-white text-purple-700 font-bold shadow-2xs'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+                title="Preview Night greeting (11 PM)"
+              >
+                🌙 Night
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Action Buttons Toolbar */}
@@ -142,6 +218,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         bills={bills}
         onOpenWhatNowModal={onOpenWhatNowModal || (() => {})}
         onOpenBriefingModal={onOpenBriefingModal || (() => {})}
+        overrideHour={timeOverride}
       />
 
       {/* Quick Stats Row */}

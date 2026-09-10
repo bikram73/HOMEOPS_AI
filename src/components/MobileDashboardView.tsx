@@ -1,6 +1,7 @@
 import React from 'react';
 import { PageTab, TaskItem, ActivityItem } from '../types';
 import { LOGO_URL } from '../data/mockData';
+import { getTimeGreeting } from '../utils/timeGreeting';
 
 interface MobileDashboardViewProps {
   tasks: TaskItem[];
@@ -15,6 +16,8 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
   setActiveTab,
   pendingTasksCount,
 }) => {
+  const timeInfo = getTimeGreeting();
+
   return (
     <div className="bg-[#f7f9fb] text-[#191c1e] min-h-screen flex flex-col pb-24 animate-in fade-in duration-200">
       {/* Mobile Top App Bar */}
@@ -45,7 +48,10 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
         <section className="flex flex-col gap-4">
           <div className="flex justify-between items-end">
             <div>
-              <p className="text-sm text-gray-500 font-medium">Good morning,</p>
+              <p className="text-sm text-gray-500 font-medium flex items-center gap-1.5">
+                <span>{timeInfo.greeting},</span>
+                <span className="text-base" role="img" aria-label={timeInfo.label}>{timeInfo.emoji}</span>
+              </p>
               <h2 className="text-2xl font-bold text-[#0F172A] tracking-tight">Demo Home</h2>
             </div>
             <div className="bg-[#99efe5] text-[#006f67] px-3.5 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 shadow-xs">

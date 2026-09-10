@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, UserProfile } from '../types';
 import { HERO_IMAGE_URL } from '../data/mockData';
 import { Sparkles, Calendar, Zap, MessageSquare } from 'lucide-react';
@@ -38,18 +38,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [isAiCardDismissed, setIsAiCardDismissed] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
-  const [timeOverride, setTimeOverride] = useState<number | undefined>(undefined);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Update real-time clock every minute
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const timeInfo = getTimeGreeting(timeOverride);
+  const timeInfo = getTimeGreeting();
 
   // Priority tasks filter
   const priorityTasks = tasks.slice(0, 4);
@@ -109,61 +99,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <p className="text-base md:text-lg text-gray-500 mt-1">
             {userProfile?.householdName ? `${userProfile.householdName} • ` : ''}{timeInfo.subtext}
           </p>
-
-          {/* Time-of-Day Quick Switcher / Status */}
-          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500">
-            <span className="text-[11px] text-gray-400 font-medium">Time mode:</span>
-            <div className="inline-flex p-0.5 bg-gray-100 rounded-lg border border-gray-200/80">
-              <button
-                type="button"
-                onClick={() => setTimeOverride(undefined)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                  timeOverride === undefined
-                    ? 'bg-white text-[#0F766E] font-bold shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
-                title="Automatic based on local device clock"
-              >
-                Auto ({currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeOverride(8)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                  timeOverride === 8
-                    ? 'bg-white text-amber-700 font-bold shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
-                title="Preview Morning greeting (8 AM)"
-              >
-                🌅 Morning
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeOverride(19)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                  timeOverride === 19
-                    ? 'bg-white text-indigo-700 font-bold shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
-                title="Preview Evening greeting (7 PM)"
-              >
-                🌆 Evening
-              </button>
-              <button
-                type="button"
-                onClick={() => setTimeOverride(23)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-all cursor-pointer ${
-                  timeOverride === 23
-                    ? 'bg-white text-purple-700 font-bold shadow-2xs'
-                    : 'text-gray-500 hover:text-gray-800'
-                }`}
-                title="Preview Night greeting (11 PM)"
-              >
-                🌙 Night
-              </button>
-            </div>
-          </div>
         </div>
 
         {/* Action Buttons Toolbar */}

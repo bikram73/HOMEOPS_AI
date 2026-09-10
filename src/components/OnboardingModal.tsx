@@ -151,9 +151,27 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
 
             {/* User Name (Required) */}
             <div className="space-y-1.5">
-              <label htmlFor="onboarding-user-name" className="block text-xs font-bold text-gray-700">
-                What should HomeOps call you? <span className="text-red-500">*</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="onboarding-user-name" className="block text-xs font-bold text-gray-700">
+                  What should HomeOps call you? <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <span>Examples:</span>
+                  {['Alex', 'Maya', 'Jordan'].map((exampleName) => (
+                    <button
+                      key={exampleName}
+                      type="button"
+                      onClick={() => {
+                        setName(exampleName);
+                        if (errorMessage) setErrorMessage(null);
+                      }}
+                      className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-[#F0FDFA] hover:text-[#0F766E] transition-colors cursor-pointer text-[10px] font-medium text-gray-600"
+                    >
+                      {exampleName}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                   <User className="w-4 h-4" />
@@ -167,18 +185,33 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                     setName(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder="e.g. Bikram"
+                  placeholder="e.g. Alex"
                   autoFocus
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-[#0F172A] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E]/40 focus:border-[#0F766E]"
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-[#0F172A] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E]/25 focus:border-[#0F766E] transition-all"
                 />
               </div>
             </div>
 
             {/* Household Name (Optional) */}
             <div className="space-y-1.5">
-              <label htmlFor="onboarding-home-name" className="block text-xs font-semibold text-gray-700">
-                Give your home a name <span className="text-gray-400 font-normal">(optional)</span>
-              </label>
+              <div className="flex items-center justify-between">
+                <label htmlFor="onboarding-home-name" className="block text-xs font-semibold text-gray-700">
+                  Give your home a name <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <span>Examples:</span>
+                  {['Maple Cottage', 'Harmony Haven', 'Skyline Loft'].map((exampleHome) => (
+                    <button
+                      key={exampleHome}
+                      type="button"
+                      onClick={() => setHouseholdName(exampleHome)}
+                      className="px-1.5 py-0.5 rounded bg-gray-100 hover:bg-[#F0FDFA] hover:text-[#0F766E] transition-colors cursor-pointer text-[10px] font-medium text-gray-600"
+                    >
+                      {exampleHome}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                   <Home className="w-4 h-4" />
@@ -188,8 +221,8 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onComp
                   type="text"
                   value={householdName}
                   onChange={(e) => setHouseholdName(e.target.value)}
-                  placeholder={name ? `${name}'s Home` : 'e.g. Manna Home'}
-                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-[#0F172A] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E]/40 focus:border-[#0F766E]"
+                  placeholder={name ? `${name}'s Place` : 'e.g. Maple Cottage'}
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-[#0F172A] placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E]/25 focus:border-[#0F766E] transition-all"
                 />
               </div>
             </div>

@@ -6,6 +6,7 @@
  */
 import { TaskItem } from '../types';
 import { INITIAL_TASKS } from '../data/mockData';
+import { hasEnteredUserDetails, removeDemoTasks } from './demoDataHelper';
 import {
   localStore,
   cookieStore,
@@ -22,18 +23,24 @@ const CACHE_TASK_KEY = 'tasks';
 
 /**
  * Synchronously retrieves stored tasks from the browser.
- * Checks localStorage first (fastest, full fidelity),
- * then falls back to cookie data, then runtime cache,
- * and defaults to INITIAL_TASKS if nothing is stored yet.
+ * If the user has entered details, only their own tasks are returned (or [] if empty).
+ * If the user has NOT entered details yet, the initial demo tasks are returned.
  */
 export function getStoredTasks(): TaskItem[] {
+  const userEnteredDetails = hasEnteredUserDetails();
+
   try {
     // 1. Primary: Browser LocalStorage (instant synchronous hydration)
     const localTasks = localStore.get<TaskItem[]>(STORAGE_KEYS.TASKS);
-    if (Array.isArray(localTasks) && localTasks.length > 0) {
-      // Warm up cache in memory
-      appCache.set(CACHE_TASK_KEY, localTasks);
-      return localTasks;
+    if (Array.isArray(localTasks)) {
+      const sanitized = userEnteredDetails ? removeDemoTasks(localTasks) : localTasks;
+      appCache.set(CACHE_TASK_KEY, sanitized);
+      if (userEnteredDetails) {
+        return sanitized;
+      }
+      if (sanitized.length > 0) {
+        return sanitized;
+      }
     }
 
     // 2. Secondary fallback: Browser Cookies
@@ -41,11 +48,16 @@ export function getStoredTasks(): TaskItem[] {
     if (cookieData) {
       try {
         const parsed = JSON.parse(cookieData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Re-hydrate localStorage for subsequent instant reads
-          localStore.set(STORAGE_KEYS.TASKS, parsed);
-          appCache.set(CACHE_TASK_KEY, parsed);
-          return parsed as TaskItem[];
+        if (Array.isArray(parsed)) {
+          const sanitized = userEnteredDetails ? removeDemoTasks(parsed) : parsed;
+          localStore.set(STORAGE_KEYS.TASKS, sanitized);
+          appCache.set(CACHE_TASK_KEY, sanitized);
+          if (userEnteredDetails) {
+            return sanitized;
+          }
+          if (sanitized.length > 0) {
+            return sanitized;
+          }
         }
       } catch (err) {
         console.warn('[TaskStore] Failed to parse tasks cookie:', err);
@@ -54,15 +66,26 @@ export function getStoredTasks(): TaskItem[] {
 
     // 3. Tertiary fallback: In-Memory / Browser Cache
     const cachedTasks = appCache.get<TaskItem[]>(CACHE_TASK_KEY);
-    if (Array.isArray(cachedTasks) && cachedTasks.length > 0) {
-      localStore.set(STORAGE_KEYS.TASKS, cachedTasks);
-      return cachedTasks;
+    if (Array.isArray(cachedTasks)) {
+      const sanitized = userEnteredDetails ? removeDemoTasks(cachedTasks) : cachedTasks;
+      localStore.set(STORAGE_KEYS.TASKS, sanitized);
+      if (userEnteredDetails) {
+        return sanitized;
+      }
+      if (sanitized.length > 0) {
+        return sanitized;
+      }
     }
   } catch (err) {
     console.warn('[TaskStore] Error retrieving stored tasks:', err);
   }
 
-  // Initial seed fallback
+  // If user entered details, return empty clean list — do not show demo tasks!
+  if (userEnteredDetails) {
+    return [];
+  }
+
+  // Initial demo seed fallback (only shown prior to entering user details)
   return INITIAL_TASKS;
 }
 

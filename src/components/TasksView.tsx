@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TaskItem, TaskPriority } from '../types';
+import { getLocalDateString } from '../utils/activityStore';
 
 interface TasksViewProps {
   tasks: TaskItem[];
@@ -18,10 +19,12 @@ export const TasksView: React.FC<TasksViewProps> = ({
   setSelectedTask,
   onDeleteTask,
 }) => {
+  const todayStr = getLocalDateString(new Date());
   const [filter, setFilter] = useState<'All' | 'Today' | 'Upcoming' | 'Completed'>('All');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
-  const [newDueDate, setNewDueDate] = useState('Today');
+  const [newDueDate, setNewDueDate] = useState(todayStr);
+  const [dateError, setDateError] = useState<string | null>(null);
   const [newPriority, setNewPriority] = useState<TaskPriority>('High');
   const [newCategory, setNewCategory] = useState('Household');
   const [newAmount, setNewAmount] = useState('');
@@ -31,19 +34,37 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const activeTask = selectedTask || tasks[0] || null;
 
   const filteredTasks = tasks.filter((t) => {
-    if (filter === 'Today') return t.dueDate.toLowerCase().includes('today') && !t.completed;
-    if (filter === 'Upcoming') return !t.dueDate.toLowerCase().includes('today') && !t.completed;
+    if (filter === 'Today') return (t.dueDate === todayStr || t.dueDate.toLowerCase().includes('today')) && !t.completed;
+    if (filter === 'Upcoming') return (t.dueDate !== todayStr && !t.dueDate.toLowerCase().includes('today')) && !t.completed;
     if (filter === 'Completed') return t.completed;
     return true;
   });
 
   const handleCreateTask = (e: React.FormEvent) => {
     e.preventDefault();
+    setDateError(null);
     if (!newTitle.trim()) return;
+
+    // Strict validation: tasks can only be scheduled on today or upcoming days
+    if (newDueDate < todayStr) {
+      setDateError('Tasks can only be scheduled for today or upcoming days. Previous dates are not allowed.');
+      return;
+    }
+
+    let displayDueDate = newDueDate;
+    if (newDueDate === todayStr) {
+      displayDueDate = 'Today';
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (newDueDate === getLocalDateString(tomorrow)) {
+        displayDueDate = 'Tomorrow';
+      }
+    }
 
     onAddTask({
       title: newTitle.trim(),
-      subtitle: `${newDueDate} • ${newCategory}`,
+      subtitle: `${displayDueDate} • ${newCategory}`,
       priority: newPriority,
       category: newCategory,
       dueDate: newDueDate,
@@ -57,6 +78,8 @@ export const TasksView: React.FC<TasksViewProps> = ({
     });
 
     setNewTitle('');
+    setNewDueDate(todayStr);
+    setDateError(null);
     setNewAmount('');
     setNewProvider('');
     setShowAddModal(false);
@@ -330,23 +353,80 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 />
               </div>
 
+              {dateError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-medium">
+                  {dateError}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Due Date</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700">Due Date *</label>
+                    <span className="text-[10px] text-teal-700 font-medium">Today / Future</span>
+                  </div>
                   <input
-                    type="text"
+                    type="date"
+                    required
+                    min={todayStr}
                     value={newDueDate}
-                    onChange={(e) => setNewDueDate(e.target.value)}
-                    placeholder="Today / Tomorrow"
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                    onChange={(e) => {
+                      setNewDueDate(e.target.value);
+                      if (e.target.value < todayStr) {
+                        setDateError('Cannot select previous dates. Only today or upcoming days are allowed.');
+                      } else {
+                        setDateError(null);
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-[#0F766E] outline-none"
                   />
+                  <div className="flex gap-1 mt-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewDueDate(todayStr);
+                        setDateError(null);
+                      }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        newDueDate === todayStr
+                          ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setNewDueDate(getLocalDateString(tomorrow));
+                        setDateError(null);
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200"
+                    >
+                      Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Date();
+                        next.setDate(next.getDate() + 3);
+                        setNewDueDate(getLocalDateString(next));
+                        setDateError(null);
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200"
+                    >
+                      +3 Days
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Priority</label>
                   <select
                     value={newPriority}
                     onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-xs font-medium text-gray-800"
                   >
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>

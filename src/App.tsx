@@ -792,6 +792,8 @@ export function App() {
                   tasks={tasks}
                   bills={bills}
                   setActiveTab={setActiveTab}
+                  onAddTask={handleAddTask}
+                  onToggleTask={handleToggleTask}
                   onAskAiAboutDate={(dateStr) => {
                     setActiveTab('assistant');
                     handleSendChatMessage(`What changes occurred in our home on ${dateStr}?`);

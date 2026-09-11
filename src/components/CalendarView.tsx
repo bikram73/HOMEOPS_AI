@@ -45,6 +45,8 @@ interface CalendarViewProps {
   bills?: BillItem[];
   setActiveTab?: (tab: PageTab) => void;
   onAskAiAboutDate?: (dateStr: string) => void;
+  onAddTask?: (task: Omit<TaskItem, 'id'>) => void;
+  onToggleTask?: (id: string) => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
@@ -52,12 +54,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   bills = [],
   setActiveTab,
   onAskAiAboutDate,
+  onAddTask,
+  onToggleTask,
 }) => {
+  const todayStr = getLocalDateString(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = getLocalDateString(tomorrow);
+
   // Calendar date states
   const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() =>
     getLocalDateString(new Date())
   );
+
+  // Computed relative states for selected date
+  const isTodaySelected = selectedDateStr === todayStr;
+  const isPastDate = selectedDateStr < todayStr;
+  const isUpcomingDate = selectedDateStr > todayStr;
+  const canAddOnSelected = selectedDateStr >= todayStr;
 
   // Activities data
   const [activities, setActivities] = useState<ActivityEvent[]>([]);
@@ -78,6 +93,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const [logBefore, setLogBefore] = useState<string>('');
   const [logAfter, setLogAfter] = useState<string>('');
   const [logDate, setLogDate] = useState<string>(selectedDateStr);
+  const [logDateError, setLogDateError] = useState<string | null>(null);
+
+  // Add Task Modal from Calendar
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState<boolean>(false);
+  const [taskTitle, setTaskTitle] = useState<string>('');
+  const [taskCategory, setTaskCategory] = useState<string>('Household');
+  const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('High');
+  const [taskDueDate, setTaskDueDate] = useState<string>(selectedDateStr);
+  const [taskAmount, setTaskAmount] = useState<string>('');
+  const [taskDateError, setTaskDateError] = useState<string | null>(null);
 
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -214,11 +239,30 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     });
   }, [activitiesByDate, selectedDateStr, selectedCategory, selectedSource, searchQuery]);
 
-  // Handle submit manual activity log
+  // Tasks scheduled on selected date
+  const tasksOnSelectedDate = useMemo(() => {
+    return tasks.filter((t) => {
+      if (!t.dueDate) return false;
+      if (t.dueDate === selectedDateStr) return true;
+      if (isTodaySelected && t.dueDate.toLowerCase().includes('today')) return true;
+      if (selectedDateStr === tomorrowStr && t.dueDate.toLowerCase().includes('tomorrow')) return true;
+      return false;
+    });
+  }, [tasks, selectedDateStr, isTodaySelected, tomorrowStr]);
+
+  // Handle submit manual activity log with past-date blocking
   const handleSaveActivity = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLogDateError(null);
     if (!logTitle.trim()) {
-      alert('Please enter an action title');
+      setLogDateError('Please enter an action title');
+      return;
+    }
+
+    const finalDate = logDate || selectedDateStr;
+    // Strict restriction: actions can only be recorded for today or upcoming days
+    if (finalDate < todayStr) {
+      setLogDateError('Actions can only be recorded or scheduled for today or upcoming days. Past dates are read-only.');
       return;
     }
 
@@ -235,7 +279,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           logBefore && logAfter
             ? { before: logBefore, after: logAfter, field: 'manual_change' }
             : undefined,
-        date: logDate || selectedDateStr,
+        date: finalDate,
         source: 'user',
       });
 
@@ -246,11 +290,73 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       setLogEntityName('');
       setLogBefore('');
       setLogAfter('');
+      setLogDateError(null);
       showToast('Activity successfully logged into history!');
     } catch (err) {
       console.error('Failed to record activity:', err);
-      alert('Failed to save activity record');
+      setLogDateError('Failed to save activity record');
     }
+  };
+
+  // Handle schedule task directly from Calendar with strict past-date blocking
+  const handleSaveTaskFromCalendar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTaskDateError(null);
+    if (!taskTitle.trim()) {
+      setTaskDateError('Please enter a task title');
+      return;
+    }
+
+    const finalDueDate = taskDueDate || selectedDateStr;
+    if (finalDueDate < todayStr) {
+      setTaskDateError('Tasks can only be scheduled for today or upcoming days. Previous dates are not allowed.');
+      return;
+    }
+
+    let displayDueDate = finalDueDate;
+    if (finalDueDate === todayStr) {
+      displayDueDate = 'Today';
+    } else if (finalDueDate === tomorrowStr) {
+      displayDueDate = 'Tomorrow';
+    }
+
+    if (onAddTask) {
+      onAddTask({
+        title: taskTitle.trim(),
+        subtitle: `${displayDueDate} • ${taskCategory}`,
+        priority: taskPriority,
+        category: taskCategory,
+        dueDate: finalDueDate,
+        amount: taskAmount ? `$${taskAmount}` : undefined,
+        completed: false,
+        aiInsight:
+          taskPriority === 'High'
+            ? 'HomeOps suggests addressing this today to prevent schedule conflicts.'
+            : undefined,
+      });
+    }
+
+    // Automatically audit log the scheduled task
+    try {
+      const newEvent = await recordActivityEvent({
+        type: 'task',
+        action: 'task_scheduled_on_calendar',
+        title: `Scheduled task: ${taskTitle.trim()}`,
+        description: `Due on ${displayDueDate} (${taskPriority} priority, ${taskCategory})`,
+        entityName: taskTitle.trim(),
+        date: finalDueDate,
+        source: 'user',
+      });
+      setActivities((prev) => [newEvent, ...prev]);
+    } catch (err) {
+      console.warn('Failed to audit task creation:', err);
+    }
+
+    setTaskTitle('');
+    setTaskAmount('');
+    setTaskDateError(null);
+    setIsTaskModalOpen(false);
+    showToast(`Task successfully scheduled for ${displayDueDate}!`);
   };
 
   // Helper for source icon & badge
@@ -327,8 +433,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     return selectedDateStr;
   }, [selectedDateStr]);
 
-  const isTodaySelected = selectedDateStr === getLocalDateString(new Date());
-
   // Overall statistics
   const totalActivitiesCount = activities.length;
   const automatedCount = activities.filter(
@@ -389,17 +493,34 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             <span>Ask AI: What Changed?</span>
           </button>
 
+          {/* Schedule Task Button */}
+          <button
+            id="btn-schedule-calendar-task"
+            onClick={() => {
+              setTaskDueDate(canAddOnSelected ? selectedDateStr : todayStr);
+              setTaskDateError(null);
+              setIsTaskModalOpen(true);
+            }}
+            className="bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+            title={canAddOnSelected ? `Schedule task for ${selectedDateStr}` : 'Schedule task for today'}
+          >
+            <Plus className="w-4 h-4" />
+            <span>{canAddOnSelected ? 'Add Task' : 'Add Task (Today)'}</span>
+          </button>
+
           {/* Log New Activity Button */}
           <button
             id="btn-log-household-activity"
             onClick={() => {
-              setLogDate(selectedDateStr);
+              setLogDate(canAddOnSelected ? selectedDateStr : todayStr);
+              setLogDateError(null);
               setIsLogModalOpen(true);
             }}
-            className="bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+            className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 active:scale-98 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer"
+            title={canAddOnSelected ? `Log activity for ${selectedDateStr}` : 'Log activity for today'}
           >
-            <Plus className="w-4 h-4" />
-            <span>Log Activity</span>
+            <CalendarIcon className="w-4 h-4 text-[#0F766E]" />
+            <span>{canAddOnSelected ? 'Log Action' : 'Log Action (Today)'}</span>
           </button>
         </div>
       </div>
@@ -630,13 +751,24 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           <div className="pb-4 border-b border-gray-200/80">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-base sm:text-lg font-bold text-[#0F172A]">
                     {formattedSelectedDate}
                   </h3>
                   {isTodaySelected && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      Today
+                      Today • Active
+                    </span>
+                  )}
+                  {isUpcomingDate && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                      Upcoming Date
+                    </span>
+                  )}
+                  {isPastDate && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">
+                      <History className="w-3 h-3 text-amber-700" />
+                      Past Date • Read-Only
                     </span>
                   )}
                 </div>
@@ -644,6 +776,41 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   {selectedDateActivities.length}{' '}
                   {selectedDateActivities.length === 1 ? 'change' : 'changes'} recorded for this day
                 </p>
+
+                {/* Date restriction banner / Action buttons */}
+                {isPastDate ? (
+                  <div className="mt-2.5 p-2 bg-amber-50/90 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div>
+                      <span className="font-bold">Historical Record:</span> You are viewing past history. Tasks and household actions can only be scheduled for <strong>today or upcoming days</strong>, not previous dates.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => {
+                        setTaskDueDate(selectedDateStr);
+                        setTaskDateError(null);
+                        setIsTaskModalOpen(true);
+                      }}
+                      className="bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Task for this Date</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setLogDate(selectedDateStr);
+                        setLogDateError(null);
+                        setIsLogModalOpen(true);
+                      }}
+                      className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                    >
+                      <CalendarIcon className="w-3.5 h-3.5 text-[#0F766E]" />
+                      <span>Log Action</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* View switch button (History vs Upcoming) */}
@@ -806,33 +973,152 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <p className="text-xs font-semibold text-gray-700">
                     No household changes recorded for this date
                   </p>
-                  <p className="text-[11px] text-gray-400 mt-1 max-w-xs">
-                    Actions you complete in tasks, inventory, shopping, bills, or Telegram will
-                    appear here.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setLogDate(selectedDateStr);
-                      setIsLogModalOpen(true);
-                    }}
-                    className="mt-3 px-3 py-1.5 bg-white hover:bg-gray-100 text-[#0F766E] border border-[#99efe5] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Log a change for this day</span>
-                  </button>
+                  {isPastDate ? (
+                    <p className="text-[11px] text-amber-700 mt-1 max-w-xs bg-amber-50 p-2 rounded-lg border border-amber-200">
+                      Historical date is read-only. Tasks and actions can only be scheduled for today or upcoming days.
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-gray-400 mt-1 max-w-xs">
+                        Actions you complete or schedule will appear here.
+                      </p>
+                      <div className="mt-3 flex items-center gap-2 flex-wrap justify-center">
+                        <button
+                          onClick={() => {
+                            setTaskDueDate(selectedDateStr);
+                            setTaskDateError(null);
+                            setIsTaskModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-[#0F766E] hover:bg-[#115E59] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Add Task for this Date</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setLogDate(selectedDateStr);
+                            setLogDateError(null);
+                            setIsLogModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-white hover:bg-gray-100 text-[#0F766E] border border-[#99efe5] rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <CalendarIcon className="w-3.5 h-3.5" />
+                          <span>Log Action</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )
             ) : (
-              /* Upcoming Deadlines / Schedule Tab */
-              <div className="space-y-3">
-                <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl text-xs text-[#0F766E] font-medium flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Household deadlines &amp; upcoming schedules</span>
+              /* Schedule / Tasks on Selected Date */
+              <div className="space-y-4">
+                {/* Specific Tasks on Selected Date */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckSquare className="w-3.5 h-3.5 text-[#0F766E]" />
+                      Tasks on {formattedSelectedDate}
+                    </h4>
+                    {canAddOnSelected && (
+                      <button
+                        onClick={() => {
+                          setTaskDueDate(selectedDateStr);
+                          setTaskDateError(null);
+                          setIsTaskModalOpen(true);
+                        }}
+                        className="text-[11px] font-bold text-[#0F766E] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3" /> Add Task
+                      </button>
+                    )}
+                  </div>
+
+                  {tasksOnSelectedDate.length > 0 ? (
+                    <div className="space-y-2">
+                      {tasksOnSelectedDate.map((task) => (
+                        <div
+                          key={task.id}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-3 transition-all ${
+                            task.completed
+                              ? 'bg-gray-50 border-gray-200 opacity-60'
+                              : 'bg-white border-teal-200 shadow-2xs hover:border-[#0F766E]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                            {onToggleTask && (
+                              <button
+                                onClick={() => onToggleTask(task.id)}
+                                className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+                                  task.completed
+                                    ? 'bg-[#0F766E] border-[#0F766E] text-white'
+                                    : 'border-gray-300 hover:border-[#0F766E]'
+                                }`}
+                              >
+                                {task.completed && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                            <div className="min-w-0">
+                              <div
+                                className={`text-xs font-bold truncate ${
+                                  task.completed ? 'line-through text-gray-400' : 'text-gray-800'
+                                }`}
+                              >
+                                {task.title}
+                              </div>
+                              <div className="text-[10px] text-gray-400 flex items-center gap-2">
+                                <span>{task.category}</span>
+                                {task.amount && (
+                                  <span className="font-semibold text-rose-600">{task.amount}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                              task.priority === 'High'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : task.priority === 'Medium'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {task.priority}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border border-dashed border-gray-200 text-center bg-gray-50/50">
+                      <p className="text-xs font-medium text-gray-600">
+                        No tasks scheduled for this date
+                      </p>
+                      {canAddOnSelected ? (
+                        <button
+                          onClick={() => {
+                            setTaskDueDate(selectedDateStr);
+                            setTaskDateError(null);
+                            setIsTaskModalOpen(true);
+                          }}
+                          className="mt-2 text-xs text-[#0F766E] font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Schedule a Task
+                        </button>
+                      ) : (
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          Tasks can only be scheduled for today or upcoming days.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
+                {/* Deadlines & Bills */}
                 {bills.filter((b) => b.status !== 'Paid').length > 0 && (
-                  <div className="space-y-1.5">
-                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                  <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Receipt className="w-3.5 h-3.5 text-rose-500" />
                       Pending Bills
                     </h4>
                     {bills
@@ -849,33 +1135,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                             </div>
                           </div>
                           <span className="font-bold text-xs text-rose-700">{bill.amount}</span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {tasks.filter((t) => !t.completed).length > 0 && (
-                  <div className="space-y-1.5 mt-3">
-                    <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                      Pending Tasks
-                    </h4>
-                    {tasks
-                      .filter((t) => !t.completed)
-                      .slice(0, 5)
-                      .map((task) => (
-                        <div
-                          key={task.id}
-                          className="p-3 rounded-xl border border-gray-200 bg-white flex items-center justify-between"
-                        >
-                          <div>
-                            <div className="text-xs font-semibold text-gray-800">{task.title}</div>
-                            <div className="text-[11px] text-gray-400">
-                              {task.category} • {task.dueDate}
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-                            {task.priority}
-                          </span>
                         </div>
                       ))}
                   </div>
@@ -953,11 +1212,25 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                   <input
                     type="date"
                     value={logDate}
-                    onChange={(e) => setLogDate(e.target.value)}
+                    min={todayStr}
+                    onChange={(e) => {
+                      setLogDate(e.target.value);
+                      if (e.target.value >= todayStr) {
+                        setLogDateError(null);
+                      }
+                    }}
                     className="w-full px-3 py-2 bg-[#F8FAFC] border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden"
                   />
+                  <span className="text-[10px] text-gray-400 mt-0.5 block">Today or upcoming days only</span>
                 </div>
               </div>
+
+              {logDateError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{logDateError}</span>
+                </div>
+              )}
 
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">Description / Notes</label>
@@ -1009,6 +1282,194 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Save Activity</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Task from Calendar Modal */}
+      {isTaskModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-[#0F766E]" />
+                <h3 className="font-bold text-[#0F172A] text-base">Schedule Task on Calendar</h3>
+              </div>
+              <button
+                onClick={() => setIsTaskModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTaskFromCalendar} className="space-y-3.5 mt-4 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Task Title <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g. Clean air purifier filter, Pest control inspection"
+                  required
+                  className="w-full px-3 py-2 bg-[#F8FAFC] border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Category</label>
+                  <select
+                    value={taskCategory}
+                    onChange={(e) => setTaskCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden"
+                  >
+                    <option value="Household">Household</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="HVAC">HVAC</option>
+                    <option value="Pest Control">Pest Control</option>
+                    <option value="Appliances">Appliances</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Safety">Safety</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Priority</label>
+                  <select
+                    value={taskPriority}
+                    onChange={(e) => setTaskPriority(e.target.value as 'High' | 'Medium' | 'Low')}
+                    className="w-full px-3 py-2 bg-[#F8FAFC] border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden"
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-semibold text-gray-700">Due Date <span className="text-rose-500">*</span></label>
+                  <span className="text-[10px] text-teal-700 font-medium">Today or upcoming days only</span>
+                </div>
+                <input
+                  type="date"
+                  value={taskDueDate}
+                  min={todayStr}
+                  onChange={(e) => {
+                    setTaskDueDate(e.target.value);
+                    if (e.target.value >= todayStr) {
+                      setTaskDateError(null);
+                    }
+                  }}
+                  required
+                  className={`w-full px-3 py-2 bg-[#F8FAFC] border rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden ${
+                    taskDateError ? 'border-rose-400' : 'border-gray-300'
+                  }`}
+                />
+                
+                {/* Quick Date Selectors */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTaskDueDate(todayStr);
+                      setTaskDateError(null);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer ${
+                      taskDueDate === todayStr
+                        ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTaskDueDate(tomorrowStr);
+                      setTaskDateError(null);
+                    }}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium border cursor-pointer ${
+                      taskDueDate === tomorrowStr
+                        ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                        : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                    }`}
+                  >
+                    Tomorrow
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 3);
+                      setTaskDueDate(getLocalDateString(d));
+                      setTaskDateError(null);
+                    }}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium border bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 cursor-pointer"
+                  >
+                    +3 Days
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      d.setDate(d.getDate() + 7);
+                      setTaskDueDate(getLocalDateString(d));
+                      setTaskDateError(null);
+                    }}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium border bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200 cursor-pointer"
+                  >
+                    +1 Week
+                  </button>
+                </div>
+              </div>
+
+              {taskDateError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{taskDateError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">
+                  Estimated Cost (Optional)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
+                  <input
+                    type="number"
+                    value={taskAmount}
+                    onChange={(e) => setTaskAmount(e.target.value)}
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    className="w-full pl-7 pr-3 py-2 bg-[#F8FAFC] border border-gray-300 rounded-lg text-xs font-medium text-gray-900 focus:bg-white focus:border-[#0F766E] outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTaskModalOpen(false)}
+                  className="flex-1 py-2 border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white font-bold rounded-lg transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Schedule Task</span>
                 </button>
               </div>
             </form>

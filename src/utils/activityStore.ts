@@ -210,25 +210,43 @@ export function getInitialSeedActivities(): ActivityEvent[] {
 // In-memory cache for fast responsive rendering
 let cachedActivities: ActivityEvent[] | null = null;
 
+import { hasEnteredUserDetails, removeDemoActivities } from './demoDataHelper';
+
 /**
- * Load all activities from IndexedDB (or fallback to seed)
+ * Load all activities from IndexedDB (or fallback to seed if user has not entered details)
  */
 export async function getAllActivities(): Promise<ActivityEvent[]> {
-  if (cachedActivities && cachedActivities.length > 0) {
-    return cachedActivities;
+  const userEnteredDetails = hasEnteredUserDetails();
+
+  if (cachedActivities !== null) {
+    if (userEnteredDetails) {
+      const sanitized = removeDemoActivities(cachedActivities);
+      cachedActivities = sanitized;
+      return sanitized;
+    }
+    if (cachedActivities.length > 0) {
+      return cachedActivities;
+    }
   }
 
   try {
     const stored = await idbGet<ActivityEvent[]>(STORES.ACTIVITIES, ACTIVITIES_RECORD_KEY);
-    if (stored && Array.isArray(stored) && stored.length > 0) {
-      cachedActivities = stored;
-      return stored;
+    if (stored && Array.isArray(stored)) {
+      const sanitized = userEnteredDetails ? removeDemoActivities(stored) : stored;
+      cachedActivities = sanitized;
+      return sanitized;
     }
   } catch (err) {
     console.warn('[ActivityStore] Failed to fetch from IndexedDB:', err);
   }
 
-  // First time initialization: use realistic seed history
+  // If user entered details, start clean — do not show seed demo activities!
+  if (userEnteredDetails) {
+    cachedActivities = [];
+    return [];
+  }
+
+  // First time initialization: use realistic seed history (only shown in initial demo mode)
   const initial = getInitialSeedActivities();
   cachedActivities = initial;
   // Save asynchronously to IndexedDB
@@ -237,6 +255,20 @@ export async function getAllActivities(): Promise<ActivityEvent[]> {
   );
 
   return initial;
+}
+
+/**
+ * Purges all demo seed activities from memory and database
+ */
+export async function purgeSeedActivities(): Promise<void> {
+  const current = (await getAllActivities()) || [];
+  const clean = removeDemoActivities(current);
+  cachedActivities = clean;
+  try {
+    await idbSet(STORES.ACTIVITIES, ACTIVITIES_RECORD_KEY, clean);
+  } catch (e) {
+    console.warn('[ActivityStore] Purge save error:', e);
+  }
 }
 
 /**

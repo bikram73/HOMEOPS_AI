@@ -831,7 +831,20 @@ export function App() {
               <CalendarView
                 tasks={tasks}
                 bills={bills}
+                inventory={inventory}
+                shoppingItems={shoppingItems}
+                maintenance={maintenance}
                 setActiveTab={setActiveTab}
+                onAddTask={handleAddTask}
+                onToggleTask={handleToggleTask}
+                onAddBill={handleAddBill}
+                onPayBill={handlePayBill}
+                onAddShoppingItem={handleAddShoppingItem}
+                onToggleShoppingItem={handleToggleShopping}
+                onAddInventoryItem={handleAddInventoryItem}
+                onUpdateAvailability={handleUpdateAvailability}
+                onAddMaintenance={handleAddMaintenance}
+                onCompleteMaintenance={handleCompleteMaintenance}
                 onAskAiAboutDate={(dateStr) => {
                   setActiveTab('assistant');
                   handleSendChatMessage(`What changes occurred in our home on ${dateStr}?`);
@@ -955,9 +968,20 @@ export function App() {
                 <CalendarView
                   tasks={tasks}
                   bills={bills}
+                  inventory={inventory}
+                  shoppingItems={shoppingItems}
+                  maintenance={maintenance}
                   setActiveTab={setActiveTab}
                   onAddTask={handleAddTask}
                   onToggleTask={handleToggleTask}
+                  onAddBill={handleAddBill}
+                  onPayBill={handlePayBill}
+                  onAddShoppingItem={handleAddShoppingItem}
+                  onToggleShoppingItem={handleToggleShopping}
+                  onAddInventoryItem={handleAddInventoryItem}
+                  onUpdateAvailability={handleUpdateAvailability}
+                  onAddMaintenance={handleAddMaintenance}
+                  onCompleteMaintenance={handleCompleteMaintenance}
                   onAskAiAboutDate={(dateStr) => {
                     setActiveTab('assistant');
                     handleSendChatMessage(`What changes occurred in our home on ${dateStr}?`);

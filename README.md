@@ -91,7 +91,8 @@ HomeOps AI is an intelligent household operations platform designed to eliminate
    - Clean slate initialization for new users (0 tasks, 0 bills, 0 inventory, 0 shopping items) without forced dummy records.
    - Automatic demo-to-user transition: initially showcases sample domestic workflows, but cleanly transitions to pure resident data as soon as custom tasks or supplies are entered.
    - Interactive First-Run Onboarding Modal (`OnboardingModal.tsx`) for household naming, occupants setup, and optional starter templates.
-   - Returning resident greeting banner (`ReturningUserGreeting.tsx`) with dynamic time-of-day awareness and action summaries.
+   - Returning resident greeting banner (`ReturningUserGreeting.tsx`) featuring all-time household accomplishments (total tasks completed, bills settled, supplies stocked, routines maintained) and operational days active since user start.
+   - Dedicated Current Day Focus metrics row (`DashboardView.tsx`) highlighting items requiring attention today: tasks due/done today, low stock/shopping needed today, bills due/paid today, and appliance maintenance routines.
 
 10. **📜 Unified Audit Log & Event Activity Stream**
     - High-fidelity event ledger (`activityStore.ts`) tracking domestic actions with ISO/local timestamps, entity categories, and source attribution.

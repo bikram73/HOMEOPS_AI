@@ -5,6 +5,8 @@ import { Sparkles, Calendar, Zap, MessageSquare, Trash2, RotateCcw } from 'lucid
 import { ReturningUserGreeting } from './ReturningUserGreeting';
 import { getTimeGreeting } from '../utils/timeGreeting';
 import { hasEnteredUserDetails } from '../utils/demoDataHelper';
+import { getLocalDateString } from '../utils/activityStore';
+import { isDateMatch } from './CalendarView';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
@@ -56,6 +58,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const upcomingBillsCount = upcomingBills.length;
   const dueMaintenance = maintenance.filter((m) => m.status === 'Overdue' || m.status === 'Due Soon');
   const dueMaintenanceCount = dueMaintenance.length;
+
+  // Current Day Calculations (for Element 2: Current Day Things)
+  const todayDate = new Date();
+  const todayStr = getLocalDateString(todayDate);
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = getLocalDateString(tomorrowDate);
+  const todayShortFormatted = todayDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  // 1. Current Day Tasks
+  const todayTasks = tasks.filter(
+    (t) => isDateMatch(t.dueDate, todayStr, todayStr, tomorrowStr) || t.date === todayStr || t.dueDate?.toLowerCase().includes('today')
+  );
+  const todayPendingTasks = todayTasks.filter((t) => !t.completed);
+  const todayCompletedTasks = todayTasks.filter((t) => t.completed);
+
+  // 2. Current Day Supplies & Urgent Needs
+  const todayCriticalStock = inventory.filter((i) => i.availability <= 25);
+  const todayShoppingNeeds = shoppingItems.filter(
+    (s) => !s.checked && (isDateMatch(s.dueDate, todayStr, todayStr, tomorrowStr) || isDateMatch(s.date, todayStr, todayStr, tomorrowStr) || s.dueDate?.toLowerCase().includes('today'))
+  );
+  const todaySupplyAttentionCount = todayCriticalStock.length + todayShoppingNeeds.length;
+
+  // 3. Current Day Bills & Dues
+  const todayBillsDue = bills.filter(
+    (b) => !b.paidThisMonth && (isDateMatch(b.dueDate, todayStr, todayStr, tomorrowStr) || b.dueCategory === 'Due Tomorrow' || b.dueDate?.toLowerCase().includes('today'))
+  );
+  const todayBillsPaid = bills.filter(
+    (b) => b.paidThisMonth && (isDateMatch(b.date, todayStr, todayStr, tomorrowStr) || b.dueDate === todayStr)
+  );
+
+  // 4. Current Day Maintenance & Routines
+  const todayMaintenanceDue = maintenance.filter(
+    (m) => m.status === 'Overdue' || isDateMatch(m.nextDue, todayStr, todayStr, tomorrowStr) || m.nextDue?.toLowerCase().includes('today')
+  );
 
   const handleActionItems = () => {
     setActiveTab('tasks');
@@ -190,9 +227,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       ) : null}
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-        {/* Pending Tasks */}
+      {/* Quick Stats Row: Current Day Things (Focused Selector 2) */}
+      <div id="card-stat-row-today" className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        {/* Today's Tasks */}
         <div
           id="card-stat-tasks"
           onClick={() => setActiveTab('tasks')}
@@ -204,21 +241,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                highPriorityCount > 0
-                  ? 'bg-[#ffdad6] text-[#93000a]'
+                todayPendingTasks.length > 0
+                  ? 'bg-amber-100 text-amber-900'
+                  : todayCompletedTasks.length > 0
+                  ? 'bg-emerald-100 text-emerald-800'
                   : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {highPriorityCount > 0 ? `${highPriorityCount} High` : '0 High'}
+              {todayPendingTasks.length > 0
+                ? `${todayPendingTasks.length} Due Today`
+                : todayCompletedTasks.length > 0
+                ? 'All Done Today'
+                : 'Clear Today'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">{pendingCount}</p>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Pending Tasks</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{todayPendingTasks.length}</p>
+            <p className="text-xs md:text-sm text-gray-900 font-semibold">Today's Tasks</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              {todayCompletedTasks.length > 0
+                ? `${todayCompletedTasks.length} completed today`
+                : `${pendingCount} total pending`}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#006a63] font-semibold mt-auto pt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#006a63] inline-block animate-pulse"></span>
+            <span>Today • {todayShortFormatted}</span>
           </div>
         </div>
 
-        {/* Low Stock */}
+        {/* Today's Supplies */}
         <div
           id="card-stat-inventory"
           onClick={() => setActiveTab('inventory')}
@@ -230,21 +282,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                lowInventoryItems.length > 0
+                todayCriticalStock.length > 0
                   ? 'bg-amber-100 text-amber-800'
+                  : todayShoppingNeeds.length > 0
+                  ? 'bg-teal-100 text-teal-800'
                   : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {lowInventoryItems.length > 0 ? `${lowInventoryItems.length} Warnings` : '0 Warnings'}
+              {todayCriticalStock.length > 0
+                ? `${todayCriticalStock.length} Low Today`
+                : todayShoppingNeeds.length > 0
+                ? `${todayShoppingNeeds.length} Buy Today`
+                : 'Stock Healthy'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">{lowInventoryItems.length}</p>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Low Stock Items</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{todaySupplyAttentionCount}</p>
+            <p className="text-xs md:text-sm text-gray-900 font-semibold">Today's Supplies</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              {todayCriticalStock.length > 0
+                ? `${todayCriticalStock.length} items need restock`
+                : 'Pantry & household stock good'}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#188ace] font-semibold mt-auto pt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#188ace] inline-block"></span>
+            <span>Today • {todayShortFormatted}</span>
           </div>
         </div>
 
-        {/* Upcoming Bills */}
+        {/* Today's Bills */}
         <div
           id="card-stat-bills"
           onClick={() => setActiveTab('bills')}
@@ -256,25 +323,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                upcomingBillsCount > 0
+                todayBillsDue.length > 0
                   ? 'bg-rose-100 text-rose-800'
+                  : todayBillsPaid.length > 0
+                  ? 'bg-emerald-100 text-emerald-800'
                   : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {upcomingBillsCount > 0
-                ? bills.some((b) => !b.paidThisMonth && b.dueCategory === 'Due Tomorrow')
-                  ? 'Due Tomorrow'
-                  : `${upcomingBillsCount} Due`
-                : '0 Due'}
+              {todayBillsDue.length > 0
+                ? `${todayBillsDue.length} Due Soon`
+                : todayBillsPaid.length > 0
+                ? 'Paid Today'
+                : 'No Dues Today'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">{upcomingBillsCount}</p>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Upcoming Bills</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{todayBillsDue.length}</p>
+            <p className="text-xs md:text-sm text-gray-900 font-semibold">Today's Bills</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              {todayBillsDue.length > 0
+                ? 'Due today or tomorrow'
+                : `${upcomingBillsCount} total upcoming this month`}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#565e74] font-semibold mt-auto pt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#565e74] inline-block"></span>
+            <span>Today • {todayShortFormatted}</span>
           </div>
         </div>
 
-        {/* Maintenance */}
+        {/* Today's Maintenance */}
         <div
           id="card-stat-maintenance"
           onClick={() => setActiveTab('maintenance')}
@@ -286,17 +364,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
             <span
               className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                dueMaintenanceCount > 0
+                todayMaintenanceDue.length > 0
                   ? 'bg-blue-100 text-blue-800'
                   : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {dueMaintenanceCount > 0 ? `${dueMaintenanceCount} Due` : '0 Due'}
+              {todayMaintenanceDue.length > 0
+                ? `${todayMaintenanceDue.length} Due Today`
+                : 'All Normal Today'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">{dueMaintenanceCount}</p>
-            <p className="text-xs md:text-sm text-gray-500 font-medium">Maintenance</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{todayMaintenanceDue.length}</p>
+            <p className="text-xs md:text-sm text-gray-900 font-semibold">Today's Routines</p>
+            <p className="text-[11px] text-gray-500 font-medium mt-0.5">
+              {todayMaintenanceDue.length > 0
+                ? 'Action needed for appliances'
+                : 'Household systems on schedule'}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-[#006f67] font-semibold mt-auto pt-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#006f67] inline-block"></span>
+            <span>Today • {todayShortFormatted}</span>
           </div>
         </div>
       </div>

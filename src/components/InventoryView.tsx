@@ -1,6 +1,149 @@
 import React, { useState } from 'react';
 import { InventoryItem, ShoppingItem } from '../types';
 
+const PRESET_EXISTING_STAPLES: Omit<InventoryItem, 'id'>[] = [
+  {
+    name: 'Laundry Detergent',
+    category: 'Cleaning',
+    location: 'Laundry Room',
+    subLocation: 'Tide Liquid 92 oz',
+    availability: 25,
+    badge: 'Low',
+    icon: 'local_laundry_service',
+    unit: '92 oz bottle',
+    currentLevelDetail: '25% (Low)',
+    estimatedRemaining: '4 washes remaining',
+    lastRestocked: 'Oct 12',
+    avgUsage: '1 bottle / 6 wks',
+  },
+  {
+    name: 'Jasmine Rice',
+    category: 'Pantry',
+    location: 'Pantry • Shelf 2',
+    subLocation: 'Long Grain 5kg',
+    availability: 70,
+    badge: 'Staple',
+    icon: 'rice_bowl',
+    unit: '5kg bag',
+    currentLevelDetail: '70% (Adequate)',
+    estimatedRemaining: '3 weeks remaining',
+    lastRestocked: 'Nov 02',
+    avgUsage: '1 bag / month',
+  },
+  {
+    name: 'Olive Oil',
+    category: 'Pantry',
+    location: 'Pantry • Shelf 1',
+    subLocation: 'Extra Virgin 1L',
+    availability: 60,
+    badge: 'Normal',
+    icon: 'oil_barrel',
+    unit: '1L Bottle',
+    currentLevelDetail: '60% (Moderate)',
+    estimatedRemaining: '2.5 weeks remaining',
+    lastRestocked: 'Oct 20',
+    avgUsage: '1 bottle / 5 wks',
+  },
+  {
+    name: 'Organic Whole Milk',
+    category: 'Fridge',
+    location: 'Kitchen Refrigerator',
+    subLocation: 'Top Shelf',
+    availability: 25,
+    badge: 'Low',
+    icon: 'liquor',
+    unit: '1 Gallon',
+    currentLevelDetail: '25% (Low)',
+    estimatedRemaining: '1 day remaining',
+    lastRestocked: 'Oct 28',
+    avgUsage: '2 gallons / wk',
+  },
+  {
+    name: 'Mint Toothpaste',
+    category: 'Personal Care',
+    location: 'Master Bathroom',
+    subLocation: 'Colgate Fresh Mint',
+    availability: 30,
+    badge: 'Low',
+    icon: 'health_and_beauty',
+    unit: '6 oz tube',
+    currentLevelDetail: '30% (Low)',
+    estimatedRemaining: '5 days remaining',
+    lastRestocked: 'Sep 25',
+    avgUsage: '1 tube / month',
+  },
+  {
+    name: 'Ground Arabica Coffee',
+    category: 'Pantry',
+    location: 'Kitchen Counter',
+    subLocation: 'Dark Roast 500g',
+    availability: 80,
+    badge: 'Staple',
+    icon: 'coffee',
+    unit: '500g canister',
+    currentLevelDetail: '80% (High)',
+    estimatedRemaining: '3 weeks remaining',
+    lastRestocked: 'Nov 05',
+    avgUsage: '1 can / month',
+  },
+  {
+    name: 'Paper Towels',
+    category: 'Cleaning',
+    location: 'Kitchen Cabinet',
+    subLocation: '2-Ply 6 Rolls',
+    availability: 40,
+    badge: 'Normal',
+    icon: 'roll_sheet',
+    unit: '6 rolls',
+    currentLevelDetail: '40% (2 rolls)',
+    estimatedRemaining: '1 week remaining',
+    lastRestocked: 'Oct 15',
+    avgUsage: '1 pk / 3 wks',
+  },
+  {
+    name: 'Dishwasher Pods',
+    category: 'Cleaning',
+    location: 'Under Sink',
+    subLocation: 'Citrus Scent 42 ct',
+    availability: 15,
+    badge: 'Low',
+    icon: 'soap',
+    unit: '42 count tub',
+    currentLevelDetail: '15% (Low)',
+    estimatedRemaining: '3 pods remaining',
+    lastRestocked: 'Sep 18',
+    avgUsage: '1 tub / 6 wks',
+  },
+  {
+    name: 'Free-Range Eggs',
+    category: 'Fridge',
+    location: 'Kitchen Refrigerator',
+    subLocation: 'Egg Tray',
+    availability: 50,
+    badge: 'Staple',
+    icon: 'egg',
+    unit: '12 count carton',
+    currentLevelDetail: '50% (6 eggs)',
+    estimatedRemaining: '4 days remaining',
+    lastRestocked: 'Nov 01',
+    avgUsage: '1 dozen / wk',
+  },
+  {
+    name: 'Trash Bags',
+    category: 'Cleaning',
+    location: 'Utility Closet',
+    subLocation: '13 Gallon 45 ct',
+    availability: 35,
+    badge: 'Normal',
+    icon: 'delete',
+    unit: '45 bags box',
+    currentLevelDetail: '35% (15 bags)',
+    estimatedRemaining: '2 weeks remaining',
+    lastRestocked: 'Oct 01',
+    avgUsage: '1 box / 2 mos',
+  },
+];
+
 interface InventoryViewProps {
   inventory: InventoryItem[];
   shoppingItems?: ShoppingItem[];
@@ -28,6 +171,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [category, setCategory] = useState('Pantry');
   const [location, setLocation] = useState('');
   const [subLocation, setSubLocation] = useState('');
+  const [unit, setUnit] = useState('');
+  const [estimatedRemaining, setEstimatedRemaining] = useState('');
   const [availability, setAvailability] = useState(50);
   const [badge, setBadge] = useState<'Staple' | 'Low' | 'Normal'>('Normal');
 
@@ -39,6 +184,32 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       )
     : undefined;
 
+  const handleApplyPreset = (preset: Omit<InventoryItem, 'id'>) => {
+    setName(preset.name);
+    setCategory(preset.category);
+    setLocation(preset.location);
+    setSubLocation(preset.subLocation || '');
+    setUnit(preset.unit || '');
+    setAvailability(preset.availability);
+    setBadge(preset.badge || 'Normal');
+    setEstimatedRemaining(preset.estimatedRemaining || '');
+  };
+
+  const handleAddPresetStaple = (preset: Omit<InventoryItem, 'id'>) => {
+    const existing = inventory.find(
+      (i) => i.name.toLowerCase() === preset.name.toLowerCase()
+    );
+    if (existing) {
+      setSelectedId(existing.id);
+      setToastMsg(`"${preset.name}" is already in inventory (highlighted)`);
+      setTimeout(() => setToastMsg(null), 3000);
+      return;
+    }
+    onAddInventoryItem(preset);
+    setToastMsg(`Added "${preset.name}" to inventory`);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
+
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -48,11 +219,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       category,
       location: location.trim() || `${category} • Main Shelf`,
       subLocation: subLocation.trim() || 'Standard Pack',
+      unit: unit.trim() || '1 item',
       availability,
       badge: availability <= 30 ? 'Low' : badge,
-      icon: category === 'Cleaning' ? 'local_laundry_service' : category === 'Fridge' ? 'liquor' : 'inventory_2',
+      icon:
+        category === 'Cleaning'
+          ? 'local_laundry_service'
+          : category === 'Fridge'
+          ? 'liquor'
+          : category === 'Personal Care'
+          ? 'health_and_beauty'
+          : 'inventory_2',
       currentLevelDetail: `${availability}%`,
-      estimatedRemaining: 'Estimated 2 weeks remaining.',
+      estimatedRemaining: estimatedRemaining.trim() || 'Estimated 2 weeks remaining.',
       lastRestocked: 'Recent',
       avgUsage: 'Regular consumption',
     });
@@ -60,6 +239,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     setName('');
     setLocation('');
     setSubLocation('');
+    setUnit('');
+    setEstimatedRemaining('');
     setShowAddModal(false);
   };
 

@@ -30,6 +30,8 @@ export interface InventoryItem {
   lastRestocked?: string;
   avgUsage?: string;
   icon?: string;
+  badge?: string;
+  date?: string;
 }
 
 export interface ShoppingItem {

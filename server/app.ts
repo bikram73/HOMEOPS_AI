@@ -60,11 +60,42 @@ export function createExpressApp(): Express {
 
   // Inventory Endpoints
   app.post('/api/inventory', (req: Request, res: Response) => {
-    const { name, quantity, unit, status, category } = req.body;
+    const {
+      name,
+      quantity,
+      unit,
+      status,
+      category,
+      location,
+      subLocation,
+      estimatedRemaining,
+      lastRestocked,
+      avgUsage,
+      icon,
+      id,
+      badge,
+      date,
+    } = req.body;
     if (!name || typeof name !== 'string' || !name.trim()) {
       return res.status(400).json({ error: 'Item name is required' });
     }
-    const item = stateManager.addInventoryItem(name.trim(), quantity, unit, status, category);
+    const item = stateManager.addInventoryItem(
+      name.trim(),
+      quantity,
+      unit,
+      status,
+      category,
+      'user',
+      location,
+      subLocation,
+      estimatedRemaining,
+      lastRestocked,
+      avgUsage,
+      icon,
+      id,
+      badge,
+      date
+    );
     res.status(201).json(item);
   });
 
@@ -74,6 +105,13 @@ export function createExpressApp(): Express {
     const item = stateManager.updateInventory(id, quantity, status);
     if (!item) return res.status(404).json({ error: 'Item not found' });
     res.json(item);
+  });
+
+  app.delete('/api/inventory/:id', (req: Request, res: Response) => {
+    const { id } = req.params;
+    const deleted = stateManager.deleteInventoryItem(id);
+    if (!deleted) return res.status(404).json({ error: 'Inventory item not found' });
+    res.json({ success: true, message: `Inventory item ${id} deleted` });
   });
 
   // Shopping Endpoints

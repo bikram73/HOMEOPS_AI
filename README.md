@@ -82,12 +82,14 @@ HomeOps AI is an intelligent household operations platform designed to eliminate
    - Category filter chips (`Home Overview`, `Tasks`, `Bills`, `Maintenance`, `Inventory`, `Shopping`, `Audit Log`).
 
 8. **🗑️ Complete CRUD Operations & Instant Item Deletion**
-   - Direct item deletion from task cards (with hover trash action), task detail inspection drawer, and calendar day feed.
+   - Direct item deletion from task cards (with hover trash action), task detail inspection drawer, inventory cards (`btn-delete-inv-:id`), inventory details pane (`btn-delete-selected-item`), and calendar day feed.
    - Coordinated deletion across tasks, shopping lists, utility bills, inventory, and appliance maintenance schedules.
-   - Automatic logging of deletion events (`task_deleted`, `shopping_item_deleted`, etc.) to the central activity stream.
+   - Automatic logging of deletion events (`task_deleted`, `inventory_removed`, `shopping_item_deleted`, etc.) to the central activity stream.
+   - Synchronous local cache clearing with real-time backend state synchronization via `DELETE /api/inventory/:id` and `DELETE /api/tasks/:id`.
 
 9. **🚀 Clean Slate Initialization & Smart Resident Onboarding**
    - Clean slate initialization for new users (0 tasks, 0 bills, 0 inventory, 0 shopping items) without forced dummy records.
+   - Automatic demo-to-user transition: initially showcases sample domestic workflows, but cleanly transitions to pure resident data as soon as custom tasks or supplies are entered.
    - Interactive First-Run Onboarding Modal (`OnboardingModal.tsx`) for household naming, occupants setup, and optional starter templates.
    - Returning resident greeting banner (`ReturningUserGreeting.tsx`) with dynamic time-of-day awareness and action summaries.
 
@@ -437,12 +439,21 @@ $$\text{Priority Score} = (\text{Due Date Proximity} \times 0.40) + (\text{Categ
 <a name="storage"></a>
 ## 💾 Storage & State Design
 
-HomeOps AI intentionally uses an **in-memory state manager** (`server/state.ts`):
+HomeOps AI employs a resilient **multi-tier hybrid persistence architecture** combined with a reactive **backend state manager** (`server/state.ts`):
 
-- **Zero-Setup Prototype**: Enables instantaneous deployment, rapid review, and full functionality without external database credentials or provisioning bottlenecks.
-- **Unified Domain Model**: Manages tasks, inventory, shopping items, utility bills, maintenance logs, and telemetry in a single reactive store.
-- **Reset Capability**: Provides a one-click `POST /api/reset` endpoint to restore clean seed data at any time.
-- *Note:* State resets when the server process restarts. Persistent cloud storage (e.g., PostgreSQL or Firestore) is planned on the production roadmap.
+1. **Multi-Tier Resilient Client Storage**:
+   - **IndexedDB**: Primary client database storing structured household entities (tasks, inventory, shopping items, bills, maintenance schedules, and activity events) across sessions and tab reloads.
+   - **LocalStorage & In-Memory AppCache**: Synchronous first-paint hydration layer ensuring zero latency during application mount.
+   - **Secure Cookie Fallback**: Safeguards basic inventory and task items against aggressive browser storage eviction.
+
+2. **Non-Destructive State Merging & Synchronization**:
+   - `POST /api/sync-state`: Client data seamlessly syncs with the Express backend, keeping the Gemini AI agent informed of user-created items.
+   - **Safe Reconciliation**: Server hydration checks existing client items by unique ID and name, preserving all custom metadata (location, availability percentages, custom notes, badges, and restocking dates) without overwriting user data with generic templates.
+
+3. **In-Memory Backend State Manager**:
+   - **Unified Domain Model**: Manages tasks, inventory, shopping items, utility bills, maintenance logs, and telemetry in a single reactive store.
+   - **Zero-Setup Deployment**: Operates reliably without complex database setup while supporting full bi-directional state synchronization.
+   - **Reset Capability**: Provides a one-click `POST /api/reset` endpoint to restore clean seed data at any time.
 
 ---
 
@@ -455,7 +466,8 @@ HomeOps AI intentionally uses an **in-memory state manager** (`server/state.ts`)
 - [x] **Agentic Tool Calling**: Gemini 2.5 Flash integrated with structured tools for tasks, inventory, shopping, bills, and maintenance.
 - [x] **"What Should I Do Now?" Engine**: Deterministic urgency scoring for instant household prioritization.
 - [x] **Interactive Household Calendar**: Multi-view schedule with date-specific item stamping and Home Reflection Snapshot.
-- [x] **Complete Domestic CRUD & Task Deletion**: Instant item deletion across cards, drawers, and timelines with audit logging.
+- [x] **Complete Domestic CRUD & Task/Inventory Deletion**: Instant item deletion across cards, drawers, and timelines with audit logging.
+- [x] **Multi-Tier Resilient Inventory Persistence**: Robust storage pipeline ensuring user supplies and stock updates never disappear on refresh.
 - [x] **Clean Slate Onboarding Flow**: Fresh session zero-data initialization and guided first-run household setup.
 - [x] **Activity Event Stream & Audit Trail**: High-fidelity local & server audit tracking for all household modifications.
 - [x] **Multi-Currency Support**: Native support for Indian Rupee (`₹`) and US Dollar (`$`).
@@ -473,6 +485,7 @@ HomeOps AI intentionally uses an **in-memory state manager** (`server/state.ts`)
 ### System & State
 - `GET /api/health` — Health status and server timestamp.
 - `GET /api/state` — Returns the entire unified household state.
+- `POST /api/sync-state` — Synchronize client state (tasks, inventory, shopping, bills, activities) to server.
 - `POST /api/reset` — Resets state to default seed data.
 
 ### AI & Agent
@@ -489,7 +502,7 @@ HomeOps AI intentionally uses an **in-memory state manager** (`server/state.ts`)
 
 ### Household Entities
 - `POST /api/tasks` | `PATCH /api/tasks/:id` | `DELETE /api/tasks/:id`
-- `POST /api/inventory` | `PATCH /api/inventory/:id`
+- `POST /api/inventory` | `PATCH /api/inventory/:id` | `DELETE /api/inventory/:id`
 - `POST /api/shopping` | `PATCH /api/shopping/:id` | `DELETE /api/shopping/:id`
 - `POST /api/bills` | `PATCH /api/bills/:id/pay`
 - `POST /api/maintenance` | `PATCH /api/maintenance/:id`

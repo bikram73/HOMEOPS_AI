@@ -17,6 +17,12 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
   pendingTasksCount,
 }) => {
   const timeInfo = getTimeGreeting();
+  const [notice, setNotice] = React.useState<string | null>(null);
+
+  const showNotificationNotice = () => {
+    setNotice('All household notifications are up to date.');
+    setTimeout(() => setNotice(null), 3000);
+  };
 
   return (
     <div className="bg-[#f7f9fb] text-[#191c1e] min-h-screen flex flex-col pb-24 animate-in fade-in duration-200">
@@ -28,8 +34,9 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => alert('No new notifications')}
-            className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            onClick={showNotificationNotice}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
+            title="Notifications"
           >
             <span className="material-symbols-outlined text-[22px]">notifications</span>
           </button>
@@ -180,6 +187,13 @@ export const MobileDashboardView: React.FC<MobileDashboardViewProps> = ({
           <span className="text-[10px] font-medium">Assistant</span>
         </button>
       </nav>
+
+      {notice && (
+        <div className="fixed bottom-20 left-4 right-4 z-50 bg-[#0F172A] text-white px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2 text-xs">
+          <span className="material-symbols-outlined text-[16px] text-teal-400">info</span>
+          <span>{notice}</span>
+        </div>
+      )}
     </div>
   );
 };

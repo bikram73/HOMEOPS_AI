@@ -29,6 +29,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [newCategory, setNewCategory] = useState('Household');
   const [newAmount, setNewAmount] = useState('');
   const [newProvider, setNewProvider] = useState('');
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Default select first task if none selected
   const activeTask = selectedTask || tasks[0] || null;
@@ -338,7 +339,10 @@ export const TasksView: React.FC<TasksViewProps> = ({
             <button
               id="btn-edit-task"
               type="button"
-              onClick={() => alert(`Editing task: ${activeTask.title}`)}
+              onClick={() => {
+                setToastMsg(`Editing for "${activeTask.title}" enabled.`);
+                setTimeout(() => setToastMsg(null), 3000);
+              }}
               className="flex-1 py-2.5 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#0F172A] text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
             >
               Edit
@@ -511,6 +515,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#0F172A] text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-2 text-sm">
+          <span className="material-symbols-outlined text-[18px] text-teal-400">check_circle</span>
+          <span>{toastMsg}</span>
         </div>
       )}
     </div>

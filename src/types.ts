@@ -78,6 +78,8 @@ export interface TaskItem {
   aiInsight?: string;
 }
 
+export type InventoryStatus = 'good' | 'low' | 'critical';
+
 export interface InventoryItem {
   id: string;
   name: string;

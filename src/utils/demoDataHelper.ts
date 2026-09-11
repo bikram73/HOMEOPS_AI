@@ -99,25 +99,31 @@ export function isDemoActivity(a: ActivityEvent): boolean {
  * Strips all pre-seeded demo items from an array of tasks.
  */
 export function removeDemoTasks(tasks: TaskItem[]): TaskItem[] {
+  if (!hasEnteredUserDetails()) return tasks;
   return tasks.filter((t) => !isDemoTask(t));
 }
 
 export function removeDemoInventory(inventory: InventoryItem[]): InventoryItem[] {
+  if (!hasEnteredUserDetails()) return inventory;
   return inventory.filter((i) => !isDemoInventory(i));
 }
 
 export function removeDemoShopping(shopping: ShoppingItem[]): ShoppingItem[] {
+  if (!hasEnteredUserDetails()) return shopping;
   return shopping.filter((s) => !isDemoShopping(s));
 }
 
 export function removeDemoBills(bills: BillItem[]): BillItem[] {
+  if (!hasEnteredUserDetails()) return bills;
   return bills.filter((b) => !isDemoBill(b));
 }
 
 export function removeDemoMaintenance(maintenance: MaintenanceItem[]): MaintenanceItem[] {
+  if (!hasEnteredUserDetails()) return maintenance;
   return maintenance.filter((m) => !isDemoMaintenance(m));
 }
 
 export function removeDemoActivities(activities: ActivityEvent[]): ActivityEvent[] {
+  if (!hasEnteredUserDetails()) return activities;
   return activities.filter((a) => !isDemoActivity(a));
 }

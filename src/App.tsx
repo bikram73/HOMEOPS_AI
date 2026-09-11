@@ -82,11 +82,31 @@ export function App() {
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile-preview'>('desktop');
 
   // Application Data States - initialized synchronously from browser LocalStorage / Cookies / Cache
-  const [tasks, setTasks] = useState<TaskItem[]>(() => getStoredTasks());
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredInventory());
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(() => getStoredShopping());
-  const [bills, setBills] = useState<BillItem[]>(() => getStoredBills());
-  const [maintenance, setMaintenance] = useState<MaintenanceItem[]>(() => getStoredMaintenance());
+  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+    const stored = getStoredTasks();
+    if (stored && stored.length > 0) return stored;
+    return hasEnteredUserDetails() ? [] : INITIAL_TASKS;
+  });
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+    const stored = getStoredInventory();
+    if (stored && stored.length > 0) return stored;
+    return hasEnteredUserDetails() ? [] : INITIAL_INVENTORY;
+  });
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(() => {
+    const stored = getStoredShopping();
+    if (stored && stored.length > 0) return stored;
+    return hasEnteredUserDetails() ? [] : INITIAL_SHOPPING;
+  });
+  const [bills, setBills] = useState<BillItem[]>(() => {
+    const stored = getStoredBills();
+    if (stored && stored.length > 0) return stored;
+    return hasEnteredUserDetails() ? [] : INITIAL_BILLS;
+  });
+  const [maintenance, setMaintenance] = useState<MaintenanceItem[]>(() => {
+    const stored = getStoredMaintenance();
+    if (stored && stored.length > 0) return stored;
+    return hasEnteredUserDetails() ? [] : INITIAL_MAINTENANCE;
+  });
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(INITIAL_CHAT);
   const [activities, setActivities] = useState<any[]>([]);
 
@@ -142,31 +162,44 @@ export function App() {
             return merged;
           });
         }
-        if (liveState.inventory) {
-          setInventory(
-            liveState.inventory.map((i) => {
-              const avail =
-                i.status === 'critical'
-                  ? 5
-                  : i.status === 'low'
-                  ? 20
-                  : i.quantity > 5
-                  ? 80
-                  : 45;
-              return {
-                id: i.id,
-                name: i.name,
-                category: i.category,
-                location: 'Pantry / Storage',
-                availability: avail,
-                badge: i.status === 'critical' || i.status === 'low' ? 'Low' : 'Normal',
-                icon: i.category.toLowerCase().includes('clean') ? 'cleaning_services' : 'local_dining',
-                unit: i.unit,
-                currentLevelDetail: `${avail}% ${avail <= 30 ? '(Low)' : '(Adequate)'}`,
-                avgUsage: 'Regular weekly use',
-              };
-            })
-          );
+        if (liveState.inventory && liveState.inventory.length > 0) {
+          setInventory((currentInv) => {
+            const localById = new Map<string, InventoryItem>(currentInv.map((i) => [i.id, i]));
+            const localByName = new Map<string, InventoryItem>(currentInv.map((i) => [i.name.toLowerCase().trim(), i]));
+            const merged: InventoryItem[] = [...currentInv];
+
+            for (const si of liveState.inventory) {
+              const matched = localById.get(si.id) || localByName.get(si.name.toLowerCase().trim());
+              if (!matched) {
+                const avail = typeof si.quantity === 'number' ? si.quantity : (si.status === 'critical' ? 10 : si.status === 'low' ? 25 : 80);
+                merged.push({
+                  id: si.id,
+                  name: si.name,
+                  category: si.category || 'General',
+                  location: si.location || 'Pantry / Storage',
+                  subLocation: si.subLocation || 'Standard Pack',
+                  availability: avail,
+                  badge: (si.badge as any) || (avail <= 30 ? 'Low' : 'Normal'),
+                  icon: si.icon || (si.category?.toLowerCase().includes('clean') ? 'cleaning_services' : 'inventory_2'),
+                  unit: si.unit || 'units',
+                  currentLevelDetail: `${avail}% ${avail <= 30 ? '(Low)' : '(Adequate)'}`,
+                  estimatedRemaining: si.estimatedRemaining || (avail <= 30 ? 'Low stock - restock soon' : 'Estimated 2-3 weeks remaining'),
+                  lastRestocked: si.lastRestocked || 'Recent',
+                  avgUsage: si.avgUsage || 'Regular weekly use',
+                  date: (si as any).date || getLocalDateString(),
+                });
+              } else {
+                if (typeof si.quantity === 'number' && si.quantity !== matched.availability) {
+                  matched.availability = si.quantity;
+                  matched.currentLevelDetail = `${si.quantity}% ${si.quantity <= 30 ? '(Low)' : '(Adequate)'}`;
+                  matched.badge = si.quantity <= 30 ? 'Low' : matched.badge === 'Staple' ? 'Staple' : 'Normal';
+                }
+              }
+            }
+
+            saveStoredInventory(merged);
+            return merged;
+          });
         }
         if (liveState.shopping) {
           setShoppingItems(
@@ -238,21 +271,48 @@ export function App() {
         saveStoredTasks(persistedState.tasks);
       }
 
-      if (persistedState) {
-        if (persistedState.inventory?.length) setInventory(persistedState.inventory);
-        if (persistedState.shopping?.length) setShoppingItems(persistedState.shopping);
-        if (persistedState.bills?.length) setBills(persistedState.bills);
-        if (persistedState.activities?.length) setActivities(persistedState.activities);
+      // Hydrate inventory from Browser Storage (LocalStorage, Cookies, Cache, IndexedDB)
+      const storedInv = getStoredInventory();
+      if (storedInv && storedInv.length > 0) {
+        setInventory(storedInv);
+      } else if (persistedState && persistedState.inventory && persistedState.inventory.length > 0) {
+        setInventory(persistedState.inventory);
+        saveStoredInventory(persistedState.inventory);
+      }
+
+      // Hydrate shopping, bills, activities
+      const storedShopping = getStoredShopping();
+      if (storedShopping && storedShopping.length > 0) {
+        setShoppingItems(storedShopping);
+      } else if (persistedState && persistedState.shopping && persistedState.shopping.length > 0) {
+        setShoppingItems(persistedState.shopping);
+        saveStoredShopping(persistedState.shopping);
+      }
+
+      const storedBills = getStoredBills();
+      if (storedBills && storedBills.length > 0) {
+        setBills(storedBills);
+      } else if (persistedState && persistedState.bills && persistedState.bills.length > 0) {
+        setBills(persistedState.bills);
+        saveStoredBills(persistedState.bills);
+      }
+
+      if (persistedState?.activities?.length) {
+        setActivities(persistedState.activities);
       }
 
       // Synchronize backend with restored data so Gemini / Caspian stay aware
       try {
         const tasksToSync = storedTasks && storedTasks.length > 0 ? storedTasks : persistedState?.tasks;
+        const invToSync = storedInv && storedInv.length > 0 ? storedInv : persistedState?.inventory;
+        const shoppingToSync = storedShopping && storedShopping.length > 0 ? storedShopping : persistedState?.shopping;
+        const billsToSync = storedBills && storedBills.length > 0 ? storedBills : persistedState?.bills;
+
         await api.syncStateWithServer({
           tasks: (tasksToSync || []) as any,
-          inventory: persistedState?.inventory as any,
-          shopping: persistedState?.shopping as any,
-          bills: persistedState?.bills as any,
+          inventory: (invToSync || []) as any,
+          shopping: (shoppingToSync || []) as any,
+          bills: (billsToSync || []) as any,
           activities: persistedState?.activities as any,
         });
       } catch {
@@ -465,6 +525,13 @@ export function App() {
       ...newItem,
       id: localId,
       date: itemDate,
+      unit: newItem.unit || 'units',
+      location: newItem.location || 'Pantry / Storage',
+      currentLevelDetail: `${newItem.availability}% ${newItem.availability <= 30 ? '(Low)' : '(Adequate)'}`,
+      badge: newItem.badge || (newItem.availability <= 30 ? 'Low' : 'Normal'),
+      estimatedRemaining: newItem.estimatedRemaining || (newItem.availability <= 30 ? 'Low stock - restock soon' : 'Estimated 2-3 weeks remaining'),
+      lastRestocked: newItem.lastRestocked || getLocalDateString(),
+      avgUsage: newItem.avgUsage || 'Regular weekly use',
     };
 
     let baseInventory = inventory;
@@ -480,7 +547,7 @@ export function App() {
       type: 'inventory',
       action: 'inventory_item_added',
       title: `Added inventory item: ${newItem.name}`,
-      description: `Category: ${newItem.category} • Availability: ${newItem.availability}%`,
+      description: `Category: ${newItem.category} • Location: ${item.location} • Availability: ${newItem.availability}%`,
       date: itemDate,
       source: 'user',
       entityType: 'inventory',
@@ -490,33 +557,68 @@ export function App() {
 
     try {
       await api.addInventoryItem({
+        id: localId,
         name: newItem.name,
-        quantity: newItem.availability > 30 ? 5 : 1,
-        unit: newItem.unit || 'units',
-        status: newItem.availability <= 30 ? 'low' : 'good',
+        quantity: newItem.availability,
+        unit: item.unit,
+        status: newItem.availability <= 20 ? 'critical' : newItem.availability <= 35 ? 'low' : 'good',
         category: newItem.category,
+        location: item.location,
+        subLocation: item.subLocation,
+        estimatedRemaining: item.estimatedRemaining,
+        lastRestocked: item.lastRestocked,
+        avgUsage: item.avgUsage,
+        icon: item.icon,
+        badge: item.badge,
+        date: itemDate,
       });
-      syncServerState();
+      await api.syncStateWithServer({ inventory: updated as any });
     } catch (e) {
-      console.error(e);
+      console.warn('Server add inventory sync fallback:', e);
     }
   };
 
-  const handleDeleteInventoryItem = (id: string) => {
+  const handleDeleteInventoryItem = async (id: string) => {
+    const target = inventory.find((i) => i.id === id);
     const updated = inventory.filter((i) => i.id !== id);
     setInventory(updated);
     saveStoredInventory(updated);
+
+    if (target) {
+      recordActivityEvent({
+        type: 'inventory',
+        action: 'inventory_removed',
+        title: `Removed inventory item: ${target.name}`,
+        description: `Location: ${target.location}`,
+        date: getLocalDateString(),
+        source: 'user',
+        entityType: 'inventory',
+        entityId: target.id,
+        entityName: target.name,
+      });
+    }
+
+    try {
+      await api.deleteInventoryItem(id);
+      await api.syncStateWithServer({ inventory: updated as any });
+    } catch (e) {
+      console.warn('Server delete inventory sync fallback:', e);
+    }
   };
 
   const handleUpdateAvailability = async (id: string, delta: number) => {
+    let targetItem: InventoryItem | undefined;
+    let newLevel = 0;
     const updated = inventory.map((item) => {
       if (item.id === id) {
-        const newLevel = Math.max(0, Math.min(100, item.availability + delta));
+        newLevel = Math.max(0, Math.min(100, item.availability + delta));
+        targetItem = item;
         return {
           ...item,
           availability: newLevel,
           badge: newLevel <= 30 ? 'Low' : item.badge === 'Staple' ? 'Staple' : 'Normal',
           currentLevelDetail: `${newLevel}% ${newLevel <= 30 ? '(Low)' : '(Adequate)'}`,
+          estimatedRemaining: newLevel <= 30 ? 'Low stock - restock soon' : item.estimatedRemaining,
         };
       }
       return item;
@@ -526,18 +628,13 @@ export function App() {
     saveStoredInventory(updated);
 
     try {
-      const item = inventory.find((i) => i.id === id);
-      if (item) {
-        const newLevel = Math.max(0, Math.min(100, item.availability + delta));
-        await api.updateInventoryQuantity(
-          id,
-          Math.ceil(newLevel / 20),
-          newLevel <= 10 ? 'critical' : newLevel <= 30 ? 'low' : 'good'
-        );
-        syncServerState();
+      if (targetItem) {
+        const computedStatus: any = newLevel <= 20 ? 'critical' : newLevel <= 35 ? 'low' : 'good';
+        await api.updateInventoryQuantity(id, newLevel, computedStatus);
+        await api.syncStateWithServer({ inventory: updated as any });
       }
     } catch (e) {
-      console.error(e);
+      console.warn('Server update inventory quantity fallback:', e);
     }
   };
 

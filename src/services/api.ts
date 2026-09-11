@@ -103,12 +103,26 @@ export const api = {
     unit?: string;
     status?: InventoryItem['status'];
     category?: string;
+    location?: string;
+    subLocation?: string;
+    estimatedRemaining?: string;
+    lastRestocked?: string;
+    avgUsage?: string;
+    icon?: string;
+    id?: string;
+    badge?: string;
+    date?: string;
   }): Promise<InventoryItem> => {
     const res = await fetch('/api/inventory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
+    return res.json();
+  },
+
+  deleteInventoryItem: async (id: string): Promise<{ success: boolean; message?: string }> => {
+    const res = await fetch(`/api/inventory/${encodeURIComponent(id)}`, { method: 'DELETE' });
     return res.json();
   },
 

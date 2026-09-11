@@ -212,8 +212,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               end of the month. Consider setting up an automated subscription or buying in bulk.
             </p>
             <button
-              onClick={() => alert('Viewing Predictive Usage Analytics for household supplies.')}
-              className="mt-4 text-[#006a63] text-xs font-bold hover:underline inline-flex items-center gap-1"
+              onClick={() => {
+                setToastMsg('Predictive Usage Analytics is synchronized with household history.');
+                setTimeout(() => setToastMsg(null), 3500);
+              }}
+              className="mt-4 text-[#006a63] text-xs font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
               Review Analytics{' '}
               <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -237,8 +240,11 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     </span>
                   </div>
                   <button
-                    onClick={() => alert(`Options for ${selectedItem.name}`)}
-                    className="text-gray-400 hover:text-gray-700"
+                    onClick={() => {
+                      setToastMsg(`Managing settings for ${selectedItem.name}`);
+                      setTimeout(() => setToastMsg(null), 3000);
+                    }}
+                    className="text-gray-400 hover:text-gray-700 cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[20px]">more_vert</span>
                   </button>

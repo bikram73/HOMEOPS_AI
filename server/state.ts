@@ -614,19 +614,39 @@ class StateManager {
     unit: string = 'unit',
     status?: InventoryItem['status'],
     category: string = 'General',
-    source: ActivitySource = 'user'
+    source: ActivitySource = 'user',
+    location?: string,
+    subLocation?: string,
+    estimatedRemaining?: string,
+    lastRestocked?: string,
+    avgUsage?: string,
+    icon?: string,
+    id?: string,
+    badge?: string,
+    date?: string
   ): InventoryItem {
     const computedStatus: InventoryItem['status'] =
       status || (quantity <= 20 ? 'critical' : quantity <= 35 ? 'low' : 'good');
 
     const existing = this.state.inventory.find(
-      (i) => i.name.toLowerCase() === name.toLowerCase()
+      (i) => (id && i.id === id) || i.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
       const prevQty = existing.quantity;
       const prevStatus = existing.status;
       existing.quantity = quantity;
       existing.status = computedStatus;
+      if (unit) existing.unit = unit;
+      if (category) existing.category = category;
+      if (location) existing.location = location;
+      if (subLocation) existing.subLocation = subLocation;
+      if (estimatedRemaining) existing.estimatedRemaining = estimatedRemaining;
+      if (lastRestocked) existing.lastRestocked = lastRestocked;
+      if (avgUsage) existing.avgUsage = avgUsage;
+      if (icon) existing.icon = icon;
+      if (badge) existing.badge = badge;
+      if (date) existing.date = date;
+
       this.recordActivityEvent({
         type: 'inventory',
         action: 'inventory_level_updated',
@@ -647,14 +667,20 @@ class StateManager {
     }
 
     const newItem: InventoryItem = {
-      id: `inv-${Date.now()}`,
+      id: id || `inv-${Date.now()}`,
       name,
-      category,
+      category: category || 'General',
       quantity,
-      unit,
+      unit: unit || 'units',
       status: computedStatus,
-      icon: 'inventory_2',
-      lastRestocked: 'Just now',
+      icon: icon || 'inventory_2',
+      location: location || 'Pantry / Storage',
+      subLocation: subLocation || 'Standard Pack',
+      estimatedRemaining: estimatedRemaining || (quantity <= 30 ? 'Low stock - restock soon' : 'Estimated 2-3 weeks remaining'),
+      lastRestocked: lastRestocked || 'Just now',
+      avgUsage: avgUsage || 'Regular weekly use',
+      badge: badge || (computedStatus === 'low' || computedStatus === 'critical' ? 'Low' : 'Normal'),
+      date: date || new Date().toISOString().split('T')[0],
     };
     this.state.inventory.push(newItem);
     this.recordActivityEvent({
@@ -674,6 +700,30 @@ class StateManager {
     }
 
     return newItem;
+  }
+
+  public deleteInventoryItem(idOrName: string, source: ActivitySource = 'user'): boolean {
+    const initialLen = this.state.inventory.length;
+    const target = this.state.inventory.find(
+      (i) => i.id === idOrName || i.name.toLowerCase() === idOrName.toLowerCase()
+    );
+    this.state.inventory = this.state.inventory.filter(
+      (i) => i.id !== idOrName && i.name.toLowerCase() !== idOrName.toLowerCase()
+    );
+    if (target) {
+      this.recordActivityEvent({
+        type: 'inventory',
+        action: 'inventory_removed',
+        title: `Inventory item removed: ${target.name}`,
+        description: `Removed from ${target.location || 'inventory'}`,
+        source,
+        entityType: 'inventory',
+        entityId: target.id,
+        entityName: target.name,
+      });
+      return true;
+    }
+    return this.state.inventory.length < initialLen;
   }
 
   public updateInventory(
@@ -1168,7 +1218,7 @@ class StateManager {
     if (Array.isArray(clientState.tasks) && clientState.tasks.length > 0) {
       this.state.tasks = clientState.tasks;
     }
-    if (Array.isArray(clientState.inventory) && clientState.inventory.length > 0) {
+    if (Array.isArray(clientState.inventory)) {
       this.state.inventory = clientState.inventory;
     }
     if (Array.isArray(clientState.shopping)) {

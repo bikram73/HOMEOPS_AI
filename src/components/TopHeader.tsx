@@ -9,8 +9,8 @@ interface TopHeaderProps {
   setActiveTab: (tab: PageTab) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  viewMode: 'desktop' | 'mobile-preview';
-  setViewMode: (mode: 'desktop' | 'mobile-preview') => void;
+  viewMode?: 'desktop' | 'mobile-preview';
+  setViewMode?: (mode: 'desktop' | 'mobile-preview') => void;
   onOpenNotifications: () => void;
   unreadCount?: number;
   profile?: UserProfile | null;
@@ -22,8 +22,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   setActiveTab,
   searchQuery,
   setSearchQuery,
-  viewMode,
-  setViewMode,
   onOpenNotifications,
   unreadCount = 2,
   profile,
@@ -145,36 +143,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <span className="material-symbols-outlined text-[16px]">public</span>
           <span>Website</span>
         </button>
-
-        {/* Device View Switcher Toggle for easy testing of Desktop vs Mobile screens */}
-        <div className="flex items-center bg-[#f1f5f9] p-1 rounded-lg border border-[#e2e8f0]">
-          <button
-            id="btn-view-desktop"
-            onClick={() => setViewMode('desktop')}
-            title="Desktop Mode"
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              viewMode === 'desktop'
-                ? 'bg-white text-[#0F172A] shadow-xs'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
-            <span className="hidden sm:inline">Desktop</span>
-          </button>
-          <button
-            id="btn-view-mobile"
-            onClick={() => setViewMode('mobile-preview')}
-            title="Mobile Screen View"
-            className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              viewMode === 'mobile-preview'
-                ? 'bg-white text-[#0F766E] shadow-xs'
-                : 'text-gray-500 hover:text-gray-900'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">smartphone</span>
-            <span className="hidden sm:inline">Mobile</span>
-          </button>
-        </div>
 
         {/* Notifications Icon Button */}
         <button

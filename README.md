@@ -75,6 +75,31 @@ HomeOps AI is an intelligent household operations platform designed to eliminate
 6. **📊 Household Analytics & Visual Telemetry**
    - Real-time chore velocity, spending breakdowns by utility type, task completion trends, and system event logs.
 
+7. **📅 Interactive Household Calendar & Schedule Engine**
+   - Multi-mode scheduling (Month, Week, Day, and Agenda timeline).
+   - **Home Reflection Snapshot**: Inspect any date to view real-time aggregations across all 5 domestic pillars (Tasks, Bills, Maintenance, Inventory, Shopping).
+   - Instant date-stamped item creation (`+ Task`, `+ Bill`, `+ Service`, `+ Stock`, `+ Shopping`) with automated date recording.
+   - Category filter chips (`Home Overview`, `Tasks`, `Bills`, `Maintenance`, `Inventory`, `Shopping`, `Audit Log`).
+
+8. **🗑️ Complete CRUD Operations & Instant Item Deletion**
+   - Direct item deletion from task cards (with hover trash action), task detail inspection drawer, and calendar day feed.
+   - Coordinated deletion across tasks, shopping lists, utility bills, inventory, and appliance maintenance schedules.
+   - Automatic logging of deletion events (`task_deleted`, `shopping_item_deleted`, etc.) to the central activity stream.
+
+9. **🚀 Clean Slate Initialization & Smart Resident Onboarding**
+   - Clean slate initialization for new users (0 tasks, 0 bills, 0 inventory, 0 shopping items) without forced dummy records.
+   - Interactive First-Run Onboarding Modal (`OnboardingModal.tsx`) for household naming, occupants setup, and optional starter templates.
+   - Returning resident greeting banner (`ReturningUserGreeting.tsx`) with dynamic time-of-day awareness and action summaries.
+
+10. **📜 Unified Audit Log & Event Activity Stream**
+    - High-fidelity event ledger (`activityStore.ts`) tracking domestic actions with ISO/local timestamps, entity categories, and source attribution.
+
+11. **🇮🇳 Multi-Currency Domestic Budgeting**
+    - Seamless support for Indian Rupee (`₹`) and US Dollar (`$`) across utility bills, task estimates, and household expense reconciliations.
+
+12. **💾 Household Data Backup & Migration (Export / Import)**
+    - One-click JSON backup export and import to archive or transfer household configurations between devices safely.
+
 ---
 
 <a name="why-caspian"></a>
@@ -245,6 +270,7 @@ This ensures that any message sent via Telegram or another connected channel exe
 │   │   ├── AnalyticsModal.tsx    # Household velocity & telemetry modal
 │   │   ├── AssistantView.tsx     # Full-page interactive AI Copilot interface
 │   │   ├── BriefingModal.tsx     # Morning executive briefing view
+│   │   ├── CalendarView.tsx      # Interactive calendar & date-based household reflection snapshot
 │   │   ├── CaspianDemoModal.tsx  # Multi-channel simulator (Telegram, Slack, Email)
 │   │   ├── DashboardView.tsx     # Primary household operations command center
 │   │   ├── InventoryView.tsx     # Pantry, fridge, and supply inventory tracker
@@ -252,17 +278,30 @@ This ensures that any message sent via Telegram or another connected channel exe
 │   │   ├── MaintenanceView.tsx   # Preventive appliance & home servicing ledger
 │   │   ├── MobileDashboardView.tsx # Compact mobile-first dashboard view
 │   │   ├── NotificationsDrawer.tsx # Real-time event & system activity feed
+│   │   ├── OnboardingModal.tsx   # First-run household setup & preferences wizard
+│   │   ├── ReturningUserGreeting.tsx # Time-aware resident greeting & quick overview
 │   │   ├── SettingsModal.tsx     # Configuration & system preferences modal
 │   │   ├── ShoppingBillsView.tsx # Grocery list & utility bill payment manager
 │   │   ├── Sidebar.tsx           # Navigation sidebar component
-│   │   ├── TasksView.tsx         # Chore & task backlog with priority filters
+│   │   ├── TasksView.tsx         # Chore & task backlog with priority filters & delete
 │   │   ├── TopHeader.tsx         # Top bar with device toggle & notifications
 │   │   ├── WeeklyPlanModal.tsx   # 7-day schedule generator
 │   │   └── WhatShouldIDoNowModal.tsx # 5-second instant decision modal
 │   ├── data/
 │   │   └── initialData.ts        # Seed data for household records
-│   └── services/
-│       └── api.ts                # Frontend API client communicating with backend
+│   ├── services/
+│   │   └── api.ts                # Frontend API client communicating with backend
+│   └── utils/
+│       ├── activityStore.ts      # Activity event ledger, date formatting & audit tracking
+│       ├── conversationStore.ts  # Persistent multi-turn AI chat history
+│       ├── demoDataHelper.ts     # Dynamic starter data loader & clean session isolation
+│       ├── exportImport.ts       # Full household JSON export and import backup engine
+│       ├── householdItemStores.ts # Persistent storage handlers for bills, stock & shopping
+│       ├── profileStore.ts       # Resident profiles and household metadata store
+│       ├── statePersistence.ts   # Local persistence synchronization with server
+│       ├── storage.ts            # Resilient local storage abstraction with fallback
+│       ├── taskStore.ts          # Task state management and urgency filters
+│       └── timeGreeting.ts       # Time-of-day domestic greeting generator
 ├── tsconfig.json                 # TypeScript compiler options
 └── vite.config.ts                # Vite build & bundler configuration
 ```
@@ -415,6 +454,12 @@ HomeOps AI intentionally uses an **in-memory state manager** (`server/state.ts`)
 - [x] **Interactive Multi-Channel Simulator**: Built-in tester to verify message flows across channels.
 - [x] **Agentic Tool Calling**: Gemini 2.5 Flash integrated with structured tools for tasks, inventory, shopping, bills, and maintenance.
 - [x] **"What Should I Do Now?" Engine**: Deterministic urgency scoring for instant household prioritization.
+- [x] **Interactive Household Calendar**: Multi-view schedule with date-specific item stamping and Home Reflection Snapshot.
+- [x] **Complete Domestic CRUD & Task Deletion**: Instant item deletion across cards, drawers, and timelines with audit logging.
+- [x] **Clean Slate Onboarding Flow**: Fresh session zero-data initialization and guided first-run household setup.
+- [x] **Activity Event Stream & Audit Trail**: High-fidelity local & server audit tracking for all household modifications.
+- [x] **Multi-Currency Support**: Native support for Indian Rupee (`₹`) and US Dollar (`$`).
+- [x] **Household Data Backup (Export/Import)**: Complete JSON state export and restoration.
 - [x] **Netlify Deployment Readiness**: Serverless functions, routing redirects, and production bundle configuration.
 - [x] **Architectural & Technical Documentation**: Detailed specs in `ARCHITECTURE.md` and `TECHNICAL_REPORT.md`.
 - [ ] **Additional Messaging Channels**: Direct SMS / WhatsApp / Discord production connectors (in roadmap).

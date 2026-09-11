@@ -50,7 +50,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Priority tasks filter
   const priorityTasks = tasks.slice(0, 4);
   const pendingCount = tasks.filter((t) => !t.completed).length;
+  const highPriorityCount = tasks.filter((t) => !t.completed && t.priority === 'High').length;
   const lowInventoryItems = inventory.filter((i) => i.availability <= 30);
+  const upcomingBills = bills.filter((b) => !b.paidThisMonth && b.dueCategory !== 'Paid');
+  const upcomingBillsCount = upcomingBills.length;
+  const dueMaintenance = maintenance.filter((m) => m.status === 'Overdue' || m.status === 'Due Soon');
+  const dueMaintenanceCount = dueMaintenance.length;
 
   const handleActionItems = () => {
     setActiveTab('tasks');
@@ -197,8 +202,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#006a63] text-[24px] group-hover:scale-110 transition-transform">
               assignment_late
             </span>
-            <span className="bg-[#ffdad6] text-[#93000a] text-xs font-semibold px-2 py-0.5 rounded-full">
-              3 High
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                highPriorityCount > 0
+                  ? 'bg-[#ffdad6] text-[#93000a]'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {highPriorityCount > 0 ? `${highPriorityCount} High` : '0 High'}
             </span>
           </div>
           <div>
@@ -217,14 +228,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#188ace] text-[24px] group-hover:scale-110 transition-transform">
               inventory_2
             </span>
-            <span className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-              {lowInventoryItems.length} Warnings
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                lowInventoryItems.length > 0
+                  ? 'bg-amber-100 text-amber-800'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {lowInventoryItems.length > 0 ? `${lowInventoryItems.length} Warnings` : '0 Warnings'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">
-              {lowInventoryItems.length > 0 ? lowInventoryItems.length : 3}
-            </p>
+            <p className="text-2xl font-bold text-[#0F172A]">{lowInventoryItems.length}</p>
             <p className="text-xs md:text-sm text-gray-500 font-medium">Low Stock Items</p>
           </div>
         </div>
@@ -239,12 +254,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#565e74] text-[24px] group-hover:scale-110 transition-transform">
               receipt_long
             </span>
-            <span className="bg-rose-100 text-rose-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-              Due Tomorrow
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                upcomingBillsCount > 0
+                  ? 'bg-rose-100 text-rose-800'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {upcomingBillsCount > 0
+                ? bills.some((b) => !b.paidThisMonth && b.dueCategory === 'Due Tomorrow')
+                  ? 'Due Tomorrow'
+                  : `${upcomingBillsCount} Due`
+                : '0 Due'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">2</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{upcomingBillsCount}</p>
             <p className="text-xs md:text-sm text-gray-500 font-medium">Upcoming Bills</p>
           </div>
         </div>
@@ -259,12 +284,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="material-symbols-outlined text-[#006f67] text-[24px] group-hover:scale-110 transition-transform">
               build
             </span>
-            <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
-              HVAC Check
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                dueMaintenanceCount > 0
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {dueMaintenanceCount > 0 ? `${dueMaintenanceCount} Due` : '0 Due'}
             </span>
           </div>
           <div>
-            <p className="text-2xl font-bold text-[#0F172A]">1</p>
+            <p className="text-2xl font-bold text-[#0F172A]">{dueMaintenanceCount}</p>
             <p className="text-xs md:text-sm text-gray-500 font-medium">Maintenance</p>
           </div>
         </div>
@@ -295,21 +326,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </span>
                 </div>
                 <p className="text-sm text-[#134E4A] mt-1 leading-relaxed">
-                  Pay electricity bill first. It's due tomorrow and late fees apply. You also have low
-                  stock items (detergent, rice) that should be queued to today's shopping list.
+                  {upcomingBillsCount > 0
+                    ? `Pay your upcoming bill (${bills.find((b) => !b.paidThisMonth)?.name || 'pending bill'}) to avoid late penalties.`
+                    : lowInventoryItems.length > 0
+                    ? `You have low stock items (${lowInventoryItems.slice(0, 2).map((i) => i.name).join(', ')}) that should be restocked.`
+                    : pendingCount > 0
+                    ? `Focus on your top priority task: "${priorityTasks[0]?.title || 'Household task'}".`
+                    : 'Your household is completely up to date with 0 pending tasks, 0 low stock warnings, and 0 overdue bills. Add tasks, inventory, or bills to begin automated tracking.'}
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     id="btn-ai-action-items"
                     onClick={handleActionItems}
-                    className="bg-[#0F766E] hover:bg-[#115E59] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-xs"
+                    className="bg-[#0F766E] hover:bg-[#115E59] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors shadow-xs cursor-pointer"
                   >
-                    Action Items
+                    {pendingCount > 0 ? 'Action Items' : 'Add First Task'}
                   </button>
                   <button
                     id="btn-ai-dismiss"
                     onClick={() => setIsAiCardDismissed(true)}
-                    className="bg-white border border-[#c6c6cd] text-[#191c1e] px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    className="bg-white border border-[#c6c6cd] text-[#191c1e] px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     Dismiss
                   </button>
@@ -334,57 +370,71 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </button>
             </div>
             <ul className="divide-y divide-[#e2e8f0]">
-              {priorityTasks.map((task) => (
-                <li
-                  key={task.id}
-                  id={`priority-item-${task.id}`}
-                  onClick={() => {
-                    onSelectTask(task);
-                    setActiveTab('tasks');
-                  }}
-                  className="p-4 md:px-6 hover:bg-[#f8fafc] transition-colors flex items-center justify-between group cursor-pointer"
-                >
-                  <div className="flex items-center gap-3.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleTask(task.id);
-                      }}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                        task.completed
-                          ? 'bg-[#0F766E] border-[#0F766E] text-white'
-                          : 'border-[#76777d] group-hover:border-[#0F766E]'
-                      }`}
-                    >
-                      {task.completed && (
-                        <span className="material-symbols-outlined text-[14px]">check</span>
-                      )}
-                    </button>
-                    <div>
-                      <p
-                        className={`text-sm font-semibold text-[#0F172A] ${
-                          task.completed ? 'line-through text-gray-400' : ''
+              {priorityTasks.length > 0 ? (
+                priorityTasks.map((task) => (
+                  <li
+                    key={task.id}
+                    id={`priority-item-${task.id}`}
+                    onClick={() => {
+                      onSelectTask(task);
+                      setActiveTab('tasks');
+                    }}
+                    className="p-4 md:px-6 hover:bg-[#f8fafc] transition-colors flex items-center justify-between group cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleTask(task.id);
+                        }}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                          task.completed
+                            ? 'bg-[#0F766E] border-[#0F766E] text-white'
+                            : 'border-[#76777d] group-hover:border-[#0F766E]'
                         }`}
                       >
-                        {task.title}
-                      </p>
-                      <p className="text-xs text-gray-500">{task.subtitle}</p>
+                        {task.completed && (
+                          <span className="material-symbols-outlined text-[14px]">check</span>
+                        )}
+                      </button>
+                      <div>
+                        <p
+                          className={`text-sm font-semibold text-[#0F172A] ${
+                            task.completed ? 'line-through text-gray-400' : ''
+                          }`}
+                        >
+                          {task.title}
+                        </p>
+                        <p className="text-xs text-gray-500">{task.subtitle}</p>
+                      </div>
                     </div>
-                  </div>
-                  <span
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                      task.priority === 'High'
-                        ? 'bg-[#ffdad6] text-[#93000a]'
-                        : task.priority === 'Medium'
-                        ? 'bg-[#99efe5]/60 text-[#006f67]'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                        task.priority === 'High'
+                          ? 'bg-[#ffdad6] text-[#93000a]'
+                          : task.priority === 'Medium'
+                          ? 'bg-[#99efe5]/60 text-[#006f67]'
+                          : 'bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {task.priority}
+                    </span>
+                  </li>
+                ))
+              ) : (
+                <li className="p-8 text-center text-gray-500">
+                  <span className="material-symbols-outlined text-emerald-600 text-3xl mb-1">check_circle</span>
+                  <p className="text-sm font-semibold text-gray-700">0 Pending Tasks</p>
+                  <p className="text-xs text-gray-400 mt-0.5">All tasks are clear. Click below to add one.</p>
+                  <button
+                    onClick={() => setActiveTab('tasks')}
+                    className="mt-3 text-xs font-bold text-[#0F766E] hover:underline cursor-pointer"
                   >
-                    {task.priority}
-                  </span>
+                    + Add New Task
+                  </button>
                 </li>
-              ))}
+              )}
             </ul>
           </div>
 
@@ -490,48 +540,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Scan
               </button>
             </div>
-            <div className="space-y-4">
-              {/* Detergent */}
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className="text-[#0F172A]">Detergent</span>
-                  <span className="text-[#ba1a1a] font-bold">5% (Critical)</span>
-                </div>
-                <div className="w-full bg-[#e0e3e5] rounded-full h-2 overflow-hidden">
-                  <div className="bg-[#ba1a1a] h-2 rounded-full" style={{ width: '5%' }}></div>
-                </div>
+            {lowInventoryItems.length > 0 ? (
+              <div className="space-y-4">
+                {lowInventoryItems.slice(0, 3).map((item) => (
+                  <div key={item.id}>
+                    <div className="flex justify-between text-xs font-medium mb-1">
+                      <span className="text-[#0F172A]">{item.name}</span>
+                      <span className={item.availability <= 10 ? 'text-[#ba1a1a] font-bold' : 'text-[#f59e0b] font-bold'}>
+                        {item.availability}% {item.availability <= 10 ? '(Critical)' : ''}
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#e0e3e5] rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full ${item.availability <= 10 ? 'bg-[#ba1a1a]' : 'bg-[#f59e0b]'}`}
+                        style={{ width: `${Math.max(5, item.availability)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              {/* Rice */}
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className="text-[#0F172A]">Rice</span>
-                  <span className="text-[#f59e0b] font-bold">15%</span>
-                </div>
-                <div className="w-full bg-[#e0e3e5] rounded-full h-2 overflow-hidden">
-                  <div className="bg-[#f59e0b] h-2 rounded-full" style={{ width: '15%' }}></div>
-                </div>
+            ) : (
+              <div className="py-6 text-center text-gray-500">
+                <span className="material-symbols-outlined text-emerald-600 text-3xl mb-1">inventory_2</span>
+                <p className="text-xs font-semibold text-gray-700">0 Low Stock Items</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">All household inventory is stocked.</p>
               </div>
+            )}
 
-              {/* Toothpaste */}
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className="text-[#0F172A]">Toothpaste</span>
-                  <span className="text-[#f59e0b] font-bold">20%</span>
-                </div>
-                <div className="w-full bg-[#e0e3e5] rounded-full h-2 overflow-hidden">
-                  <div className="bg-[#f59e0b] h-2 rounded-full" style={{ width: '20%' }}></div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              id="btn-add-all-to-list"
-              onClick={handleAddAllClick}
-              className="w-full mt-6 py-2.5 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-[#e2e8f0] rounded-lg text-xs md:text-sm font-semibold text-[#0F172A] transition-colors"
-            >
-              Add All to List
-            </button>
+            {lowInventoryItems.length > 0 && (
+              <button
+                id="btn-add-all-to-list"
+                onClick={handleAddAllClick}
+                className="w-full mt-6 py-2.5 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-[#e2e8f0] rounded-lg text-xs md:text-sm font-semibold text-[#0F172A] transition-colors cursor-pointer"
+              >
+                Add All to List
+              </button>
+            )}
           </div>
         </div>
       </div>

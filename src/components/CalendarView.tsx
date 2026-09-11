@@ -28,6 +28,7 @@ import {
   DollarSign,
   Layers,
   ExternalLink,
+  Home,
 } from 'lucide-react';
 import {
   ActivityEvent,
@@ -59,7 +60,7 @@ interface CalendarViewProps {
   onToggleTask?: (id: string) => void;
   onAddBill?: (bill: Omit<BillItem, 'id'>) => void;
   onPayBill?: (id: string) => void;
-  onAddShoppingItem?: (name: string, category?: string) => void;
+  onAddShoppingItem?: (name: string, category?: string, date?: string) => void;
   onToggleShoppingItem?: (id: string) => void;
   onAddInventoryItem?: (item: Omit<InventoryItem, 'id'>) => void;
   onUpdateAvailability?: (id: string, delta: number) => void;
@@ -286,6 +287,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const getItemsForDate = (targetDateStr: string) => {
     // 1. Tasks
     const dayTasks = tasks.filter((t) => {
+      if (t.date === targetDateStr) return true;
       if (isDateMatch(t.dueDate, targetDateStr, todayStr, tomorrowStr)) return true;
       return activities.some(
         (a) =>
@@ -297,6 +299,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     // 2. Bills
     const dayBills = bills.filter((b) => {
+      if (b.date === targetDateStr) return true;
       if (isDateMatch(b.dueDate, targetDateStr, todayStr, tomorrowStr)) return true;
       if (targetDateStr === todayStr && (b.dueCategory === 'Due Soon' || b.paidThisMonth)) return true;
       if (targetDateStr === tomorrowStr && b.dueCategory === 'Due Tomorrow') return true;
@@ -304,35 +307,39 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         (a) =>
           a.date === targetDateStr &&
           a.type === 'bill' &&
-          a.entityName?.toLowerCase() === b.name.toLowerCase()
+          (a.entityId === b.id || a.entityName?.toLowerCase() === b.name.toLowerCase())
       );
     });
 
     // 3. Maintenance
     const dayMaintenance = maintenance.filter((m) => {
+      if (m.date === targetDateStr) return true;
       if (isDateMatch(m.nextDue, targetDateStr, todayStr, tomorrowStr)) return true;
+      if (isDateMatch(m.lastDone, targetDateStr, todayStr, tomorrowStr)) return true;
       if (
         targetDateStr === todayStr &&
         (m.status === 'Due Soon' || m.status === 'Overdue' || m.lastDone === 'Today')
       )
         return true;
-      if (targetDateStr === tomorrowStr && m.nextDue.toLowerCase().includes('tomorrow'))
+      if (targetDateStr === tomorrowStr && m.nextDue?.toLowerCase().includes('tomorrow'))
         return true;
       return activities.some(
         (a) =>
           a.date === targetDateStr &&
           a.type === 'maintenance' &&
-          a.entityName?.toLowerCase() === m.title.toLowerCase()
+          (a.entityId === m.id || a.entityName?.toLowerCase() === m.title.toLowerCase())
       );
     });
 
     // 4. Inventory
     const dayInventory = inventory.filter((item) => {
+      if (item.date === targetDateStr) return true;
+      if (isDateMatch(item.lastRestocked, targetDateStr, todayStr, tomorrowStr)) return true;
       const hasAct = activities.some(
         (a) =>
           a.date === targetDateStr &&
           a.type === 'inventory' &&
-          a.entityName?.toLowerCase() === item.name.toLowerCase()
+          (a.entityId === item.id || a.entityName?.toLowerCase() === item.name.toLowerCase())
       );
       if (hasAct) return true;
       if (
@@ -348,11 +355,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
     // 5. Shopping
     const dayShopping = shoppingItems.filter((item) => {
+      if (item.date === targetDateStr) return true;
+      if (isDateMatch(item.dueDate, targetDateStr, todayStr, tomorrowStr)) return true;
       const hasAct = activities.some(
         (a) =>
           a.date === targetDateStr &&
           a.type === 'shopping' &&
-          a.entityName?.toLowerCase() === item.name.toLowerCase()
+          (a.entityId === item.id || a.entityName?.toLowerCase() === item.name.toLowerCase())
       );
       if (hasAct) return true;
       if (targetDateStr === todayStr && !item.checked) return true;
@@ -484,7 +493,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             priority: taskPriority,
             category: taskCategory,
             dueDate: finalDate,
-            amount: taskAmount ? `$${taskAmount}` : undefined,
+            date: finalDate,
+            amount: taskAmount ? (taskAmount.startsWith('₹') || taskAmount.startsWith('$') ? taskAmount : `₹${taskAmount}`) : undefined,
             completed: false,
           });
         }
@@ -506,12 +516,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           setAddModalError('Please enter bill name and amount');
           return;
         }
-        const amtStr = billAmount.startsWith('$') ? billAmount : `$${billAmount}`;
+        const amtStr = billAmount.startsWith('₹') || billAmount.startsWith('$') ? billAmount : `₹${billAmount}`;
         if (onAddBill) {
           onAddBill({
             name: billName.trim(),
             amount: amtStr,
             dueDate: finalDate,
+            date: finalDate,
             dueCategory: finalDate === tomorrowStr ? 'Due Tomorrow' : 'Due Soon',
             isAutoPay: billAutoPay,
             icon: 'receipt',
@@ -543,6 +554,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             interval: maintInterval,
             lastDone: 'Not yet completed',
             nextDue: finalDate,
+            date: finalDate,
             status: 'Due Soon',
             icon: 'build',
           });
@@ -565,7 +577,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           return;
         }
         if (onAddShoppingItem) {
-          onAddShoppingItem(shoppingName.trim(), shoppingCategory);
+          onAddShoppingItem(shoppingName.trim(), shoppingCategory, finalDate);
         }
         const act = await recordActivityEvent({
           type: 'shopping',
@@ -594,6 +606,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             icon: 'inventory_2',
             unit: 'units',
             lastRestocked: displayDueDate,
+            date: finalDate,
           });
         }
         const act = await recordActivityEvent({
@@ -1101,13 +1114,53 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
               {/* Action Buttons for Selected Date */}
               {canAddOnSelected && (
-                <button
-                  onClick={() => openAddModal('task')}
-                  className="bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add for Date</span>
-                </button>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    onClick={() => openAddModal('task')}
+                    className="bg-[#0F766E] hover:bg-[#115E59] active:scale-98 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all shadow-2xs cursor-pointer"
+                    title="Add item for this date"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Item</span>
+                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => openAddModal('task')}
+                      className="text-[11px] px-2 py-1 rounded-md bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-medium border border-emerald-200 transition-colors cursor-pointer"
+                      title="Add Task for this date"
+                    >
+                      + Task
+                    </button>
+                    <button
+                      onClick={() => openAddModal('bill')}
+                      className="text-[11px] px-2 py-1 rounded-md bg-rose-50 text-rose-800 hover:bg-rose-100 font-medium border border-rose-200 transition-colors cursor-pointer"
+                      title="Add Bill for this date"
+                    >
+                      + Bill
+                    </button>
+                    <button
+                      onClick={() => openAddModal('maintenance')}
+                      className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-800 hover:bg-indigo-100 font-medium border border-indigo-200 transition-colors cursor-pointer"
+                      title="Add Service for this date"
+                    >
+                      + Service
+                    </button>
+                    <button
+                      onClick={() => openAddModal('inventory')}
+                      className="text-[11px] px-2 py-1 rounded-md bg-teal-50 text-teal-800 hover:bg-teal-100 font-medium border border-teal-200 transition-colors cursor-pointer"
+                      title="Add Inventory for this date"
+                    >
+                      + Stock
+                    </button>
+                    <button
+                      onClick={() => openAddModal('shopping')}
+                      className="text-[11px] px-2 py-1 rounded-md bg-amber-50 text-amber-800 hover:bg-amber-100 font-medium border border-amber-200 transition-colors cursor-pointer"
+                      title="Add Shopping Item for this date"
+                    >
+                      + Shopping
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -1144,7 +1197,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
             {/* Category Filter Chips for this Date */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 mt-2.5 scrollbar-hide text-[11px]">
               {[
-                { id: 'all', label: `All (${selectedDayItems.totalCount})` },
+                { id: 'all', label: `Home Overview (${selectedDayItems.totalCount})` },
                 { id: 'tasks', label: `Tasks (${selectedDayItems.tasks.length})` },
                 { id: 'bills', label: `Bills (${selectedDayItems.bills.length})` },
                 { id: 'maintenance', label: `Maintenance (${selectedDayItems.maintenance.length})` },
@@ -1169,6 +1222,89 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
           {/* Detailed Content Feed for Selected Date */}
           <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-4 max-h-[520px]">
+            {/* HOME & HOUSEHOLD OVERVIEW SNAPSHOT ON SELECTED DATE */}
+            {activeTabSection === 'all' && (
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-teal-50/70 to-emerald-50/60 border border-teal-200/80 shadow-2xs">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Home className="w-4 h-4 text-[#0F766E]" />
+                    <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                      Home Reflection Snapshot
+                    </h4>
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#0F766E] bg-white/80 px-2 py-0.5 rounded-full border border-teal-200">
+                    {selectedDayItems.totalCount} active items & events
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  <button
+                    onClick={() => setActiveTabSection('tasks')}
+                    className="p-2 rounded-lg bg-white/90 border border-emerald-200 hover:border-emerald-500 hover:shadow-2xs transition-all text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mb-1">
+                      <span>Tasks</span>
+                      <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    </div>
+                    <div className="text-lg font-bold text-gray-800">
+                      {selectedDayItems.tasks.length}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTabSection('bills')}
+                    className="p-2 rounded-lg bg-white/90 border border-rose-200 hover:border-rose-500 hover:shadow-2xs transition-all text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mb-1">
+                      <span>Bills</span>
+                      <Receipt className="w-3.5 h-3.5 text-rose-600" />
+                    </div>
+                    <div className="text-lg font-bold text-gray-800">
+                      {selectedDayItems.bills.length}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTabSection('maintenance')}
+                    className="p-2 rounded-lg bg-white/90 border border-indigo-200 hover:border-indigo-500 hover:shadow-2xs transition-all text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mb-1">
+                      <span>Service</span>
+                      <Wrench className="w-3.5 h-3.5 text-indigo-600" />
+                    </div>
+                    <div className="text-lg font-bold text-gray-800">
+                      {selectedDayItems.maintenance.length}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTabSection('inventory')}
+                    className="p-2 rounded-lg bg-white/90 border border-teal-200 hover:border-teal-500 hover:shadow-2xs transition-all text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mb-1">
+                      <span>Inventory</span>
+                      <Package className="w-3.5 h-3.5 text-teal-600" />
+                    </div>
+                    <div className="text-lg font-bold text-gray-800">
+                      {selectedDayItems.inventory.length}
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTabSection('shopping')}
+                    className="p-2 rounded-lg bg-white/90 border border-amber-200 hover:border-amber-500 hover:shadow-2xs transition-all text-left cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 font-medium mb-1">
+                      <span>Shopping</span>
+                      <ShoppingCart className="w-3.5 h-3.5 text-amber-600" />
+                    </div>
+                    <div className="text-lg font-bold text-gray-800">
+                      {selectedDayItems.shopping.length}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
             {/* 1. TASKS SECTION */}
             {(activeTabSection === 'all' || activeTabSection === 'tasks') && (
               <div className="space-y-2">

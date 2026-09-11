@@ -75,7 +75,7 @@ import {
   removeDemoBills,
   removeDemoMaintenance,
 } from './utils/demoDataHelper';
-import { recordActivityEvent } from './utils/activityStore';
+import { recordActivityEvent, getLocalDateString } from './utils/activityStore';
 
 export function App() {
   const [activeTab, setActiveTab] = useState<PageTab>('landing');
@@ -88,7 +88,7 @@ export function App() {
   const [bills, setBills] = useState<BillItem[]>(() => getStoredBills());
   const [maintenance, setMaintenance] = useState<MaintenanceItem[]>(() => getStoredMaintenance());
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(INITIAL_CHAT);
-  const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
+  const [activities, setActivities] = useState<any[]>([]);
 
   // User Profile & Onboarding State
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -375,9 +375,11 @@ export function App() {
 
   const handleAddTask = async (newTask: Omit<TaskItem, 'id'>) => {
     const localId = `task-${Date.now()}`;
+    const itemDate = newTask.date || (newTask.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(newTask.dueDate) ? newTask.dueDate : getLocalDateString());
     const item: TaskItem = {
       ...newTask,
       id: localId,
+      date: itemDate,
     };
 
     let baseTasks = tasks;
@@ -399,6 +401,7 @@ export function App() {
       action: 'task_created',
       title: `Created task: ${newTask.title}`,
       description: `Category: ${newTask.category} • Priority: ${newTask.priority} • Due: ${newTask.dueDate}`,
+      date: itemDate,
       source: 'user',
       entityType: 'task',
       entityId: localId,
@@ -457,9 +460,11 @@ export function App() {
   // Handlers for Inventory
   const handleAddInventoryItem = async (newItem: Omit<InventoryItem, 'id'>) => {
     const localId = `inv-${Date.now()}`;
+    const itemDate = newItem.date || (newItem.lastRestocked && /^\d{4}-\d{2}-\d{2}$/.test(newItem.lastRestocked) ? newItem.lastRestocked : getLocalDateString());
     const item: InventoryItem = {
       ...newItem,
       id: localId,
+      date: itemDate,
     };
 
     let baseInventory = inventory;
@@ -470,6 +475,18 @@ export function App() {
     const updated = [item, ...baseInventory];
     setInventory(updated);
     saveStoredInventory(updated);
+
+    recordActivityEvent({
+      type: 'inventory',
+      action: 'inventory_item_added',
+      title: `Added inventory item: ${newItem.name}`,
+      description: `Category: ${newItem.category} • Availability: ${newItem.availability}%`,
+      date: itemDate,
+      source: 'user',
+      entityType: 'inventory',
+      entityId: localId,
+      entityName: newItem.name,
+    });
 
     try {
       await api.addInventoryItem({
@@ -553,7 +570,7 @@ export function App() {
     }
   };
 
-  const handleAddShoppingItem = async (name: string, category: string) => {
+  const handleAddShoppingItem = async (name: string, category: string, date?: string) => {
     const exists = shoppingItems.find((s) => s.name.toLowerCase() === name.toLowerCase());
     if (exists) return;
 
@@ -563,17 +580,31 @@ export function App() {
       baseShopping = removeDemoShopping(shoppingItems);
     }
 
+    const itemDate = date || getLocalDateString();
     const newItem: ShoppingItem = {
       id: `shop-${Date.now()}`,
       name,
       category,
       quantity: '1',
       checked: false,
+      date: itemDate,
     };
 
     const updated = [...baseShopping, newItem];
     setShoppingItems(updated);
     saveStoredShopping(updated);
+
+    recordActivityEvent({
+      type: 'shopping',
+      action: 'shopping_item_added',
+      title: `Added to shopping list: ${name}`,
+      description: `Category: ${category}`,
+      date: itemDate,
+      source: 'user',
+      entityType: 'shopping',
+      entityId: newItem.id,
+      entityName: name,
+    });
 
     try {
       await api.addShoppingItem(name, '1', category);
@@ -598,13 +629,27 @@ export function App() {
       baseBills = removeDemoBills(bills);
     }
 
+    const itemDate = newBill.date || (newBill.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(newBill.dueDate) ? newBill.dueDate : getLocalDateString());
     const item: BillItem = {
       ...newBill,
       id: `bill-${Date.now()}`,
+      date: itemDate,
     };
     const updated = [item, ...baseBills];
     setBills(updated);
     saveStoredBills(updated);
+
+    recordActivityEvent({
+      type: 'bill',
+      action: 'bill_added',
+      title: `Added bill: ${newBill.name}`,
+      description: `Amount: ${newBill.amount} • Due: ${newBill.dueDate}`,
+      date: itemDate,
+      source: 'user',
+      entityType: 'bill',
+      entityId: item.id,
+      entityName: newBill.name,
+    });
   };
 
   const handleDeleteBill = (billId: string) => {
@@ -652,13 +697,27 @@ export function App() {
       baseMaint = removeDemoMaintenance(maintenance);
     }
 
+    const itemDate = newMaint.date || (newMaint.nextDue && /^\d{4}-\d{2}-\d{2}$/.test(newMaint.nextDue) ? newMaint.nextDue : getLocalDateString());
     const item: MaintenanceItem = {
       ...newMaint,
       id: `m-${Date.now()}`,
+      date: itemDate,
     };
     const updated = [item, ...baseMaint];
     setMaintenance(updated);
     saveStoredMaintenance(updated);
+
+    recordActivityEvent({
+      type: 'maintenance',
+      action: 'maintenance_scheduled',
+      title: `Scheduled service: ${newMaint.title}`,
+      description: `System: ${newMaint.system} • Next Due: ${newMaint.nextDue}`,
+      date: itemDate,
+      source: 'user',
+      entityType: 'maintenance',
+      entityId: item.id,
+      entityName: newMaint.title,
+    });
   };
 
   const handleDeleteMaintenance = (id: string) => {

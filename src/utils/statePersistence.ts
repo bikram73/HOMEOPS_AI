@@ -5,6 +5,14 @@
  */
 import { TaskItem, InventoryItem, ShoppingItem, BillItem, ActivityItem, ActivityEvent } from '../types';
 import { idbGet, idbSet, idbDelete, STORES } from './storage';
+import {
+  removeDemoTasks,
+  removeDemoInventory,
+  removeDemoShopping,
+  removeDemoBills,
+  removeDemoMaintenance,
+  removeDemoActivities,
+} from './demoDataHelper';
 
 export interface PersistedHouseholdState {
   tasks: TaskItem[];
@@ -51,7 +59,16 @@ export async function loadHouseholdState(): Promise<PersistedHouseholdState | nu
   try {
     const data = await idbGet<PersistedHouseholdState>(STORES.HOUSEHOLD_STATE, STATE_RECORD_KEY);
     if (!data) return null;
-    return data;
+    return {
+      ...data,
+      tasks: removeDemoTasks(data.tasks || []),
+      inventory: removeDemoInventory(data.inventory || []),
+      shopping: removeDemoShopping(data.shopping || []),
+      bills: removeDemoBills(data.bills || []),
+      maintenance: removeDemoMaintenance(data.maintenance || []),
+      activities: (data.activities || []).filter((a: any) => !a.id?.startsWith('act-')),
+      activityEvents: removeDemoActivities(data.activityEvents || []),
+    };
   } catch (err) {
     console.warn('[HomeOps StatePersistence] Failed to load state:', err);
     return null;

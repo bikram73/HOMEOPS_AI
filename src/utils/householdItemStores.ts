@@ -52,15 +52,13 @@ const CACHE_MAINT_KEY = 'maintenance';
 // ==========================================
 
 export function getStoredInventory(): InventoryItem[] {
-  const userEntered = hasEnteredUserDetails();
-
   try {
     // 1. LocalStorage
     const local = localStore.get<InventoryItem[]>(STORAGE_KEYS.INVENTORY);
     if (Array.isArray(local)) {
-      const sanitized = userEntered ? removeDemoInventory(local) : local;
+      const sanitized = removeDemoInventory(local);
       appCache.set(CACHE_INV_KEY, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
 
     // 2. Cookie Fallback
@@ -69,10 +67,10 @@ export function getStoredInventory(): InventoryItem[] {
       try {
         const parsed = JSON.parse(cookieData);
         if (Array.isArray(parsed)) {
-          const sanitized = userEntered ? removeDemoInventory(parsed) : parsed;
+          const sanitized = removeDemoInventory(parsed);
           localStore.set(STORAGE_KEYS.INVENTORY, sanitized);
           appCache.set(CACHE_INV_KEY, sanitized);
-          if (userEntered || sanitized.length > 0) return sanitized;
+          return sanitized;
         }
       } catch {}
     }
@@ -80,16 +78,16 @@ export function getStoredInventory(): InventoryItem[] {
     // 3. Cache
     const cached = appCache.get<InventoryItem[]>(CACHE_INV_KEY);
     if (Array.isArray(cached)) {
-      const sanitized = userEntered ? removeDemoInventory(cached) : cached;
+      const sanitized = removeDemoInventory(cached);
       localStore.set(STORAGE_KEYS.INVENTORY, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
   } catch (err) {
     console.warn('[InventoryStore] Error reading storage:', err);
   }
 
-  if (userEntered) return [];
-  return INITIAL_INVENTORY;
+  // Initial for new user starts completely at 0 items!
+  return [];
 }
 
 export function saveStoredInventory(items: InventoryItem[]): boolean {
@@ -149,15 +147,13 @@ export async function clearStoredInventory(): Promise<void> {
 // ==========================================
 
 export function getStoredShopping(): ShoppingItem[] {
-  const userEntered = hasEnteredUserDetails();
-
   try {
     // 1. LocalStorage
     const local = localStore.get<ShoppingItem[]>(STORAGE_KEYS.SHOPPING);
     if (Array.isArray(local)) {
-      const sanitized = userEntered ? removeDemoShopping(local) : local;
+      const sanitized = removeDemoShopping(local);
       appCache.set(CACHE_SHOP_KEY, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
 
     // 2. Cookie Fallback
@@ -166,10 +162,10 @@ export function getStoredShopping(): ShoppingItem[] {
       try {
         const parsed = JSON.parse(cookieData);
         if (Array.isArray(parsed)) {
-          const sanitized = userEntered ? removeDemoShopping(parsed) : parsed;
+          const sanitized = removeDemoShopping(parsed);
           localStore.set(STORAGE_KEYS.SHOPPING, sanitized);
           appCache.set(CACHE_SHOP_KEY, sanitized);
-          if (userEntered || sanitized.length > 0) return sanitized;
+          return sanitized;
         }
       } catch {}
     }
@@ -177,16 +173,16 @@ export function getStoredShopping(): ShoppingItem[] {
     // 3. Cache
     const cached = appCache.get<ShoppingItem[]>(CACHE_SHOP_KEY);
     if (Array.isArray(cached)) {
-      const sanitized = userEntered ? removeDemoShopping(cached) : cached;
+      const sanitized = removeDemoShopping(cached);
       localStore.set(STORAGE_KEYS.SHOPPING, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
   } catch (err) {
     console.warn('[ShoppingStore] Error reading storage:', err);
   }
 
-  if (userEntered) return [];
-  return INITIAL_SHOPPING;
+  // Initial for new user starts completely at 0 items!
+  return [];
 }
 
 export function saveStoredShopping(items: ShoppingItem[]): boolean {
@@ -245,15 +241,13 @@ export async function clearStoredShopping(): Promise<void> {
 // ==========================================
 
 export function getStoredBills(): BillItem[] {
-  const userEntered = hasEnteredUserDetails();
-
   try {
     // 1. LocalStorage
     const local = localStore.get<BillItem[]>(STORAGE_KEYS.BILLS);
     if (Array.isArray(local)) {
-      const sanitized = userEntered ? removeDemoBills(local) : local;
+      const sanitized = removeDemoBills(local);
       appCache.set(CACHE_BILLS_KEY, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
 
     // 2. Cookie Fallback
@@ -262,10 +256,10 @@ export function getStoredBills(): BillItem[] {
       try {
         const parsed = JSON.parse(cookieData);
         if (Array.isArray(parsed)) {
-          const sanitized = userEntered ? removeDemoBills(parsed) : parsed;
+          const sanitized = removeDemoBills(parsed);
           localStore.set(STORAGE_KEYS.BILLS, sanitized);
           appCache.set(CACHE_BILLS_KEY, sanitized);
-          if (userEntered || sanitized.length > 0) return sanitized;
+          return sanitized;
         }
       } catch {}
     }
@@ -273,16 +267,16 @@ export function getStoredBills(): BillItem[] {
     // 3. Cache
     const cached = appCache.get<BillItem[]>(CACHE_BILLS_KEY);
     if (Array.isArray(cached)) {
-      const sanitized = userEntered ? removeDemoBills(cached) : cached;
+      const sanitized = removeDemoBills(cached);
       localStore.set(STORAGE_KEYS.BILLS, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
   } catch (err) {
     console.warn('[BillsStore] Error reading storage:', err);
   }
 
-  if (userEntered) return [];
-  return INITIAL_BILLS;
+  // Initial for new user starts completely at 0 items!
+  return [];
 }
 
 export function saveStoredBills(items: BillItem[]): boolean {
@@ -342,15 +336,13 @@ export async function clearStoredBills(): Promise<void> {
 // ==========================================
 
 export function getStoredMaintenance(): MaintenanceItem[] {
-  const userEntered = hasEnteredUserDetails();
-
   try {
     // 1. LocalStorage
     const local = localStore.get<MaintenanceItem[]>(STORAGE_KEYS.MAINTENANCE);
     if (Array.isArray(local)) {
-      const sanitized = userEntered ? removeDemoMaintenance(local) : local;
+      const sanitized = removeDemoMaintenance(local);
       appCache.set(CACHE_MAINT_KEY, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
 
     // 2. Cookie Fallback
@@ -359,10 +351,10 @@ export function getStoredMaintenance(): MaintenanceItem[] {
       try {
         const parsed = JSON.parse(cookieData);
         if (Array.isArray(parsed)) {
-          const sanitized = userEntered ? removeDemoMaintenance(parsed) : parsed;
+          const sanitized = removeDemoMaintenance(parsed);
           localStore.set(STORAGE_KEYS.MAINTENANCE, sanitized);
           appCache.set(CACHE_MAINT_KEY, sanitized);
-          if (userEntered || sanitized.length > 0) return sanitized;
+          return sanitized;
         }
       } catch {}
     }
@@ -370,16 +362,16 @@ export function getStoredMaintenance(): MaintenanceItem[] {
     // 3. Cache
     const cached = appCache.get<MaintenanceItem[]>(CACHE_MAINT_KEY);
     if (Array.isArray(cached)) {
-      const sanitized = userEntered ? removeDemoMaintenance(cached) : cached;
+      const sanitized = removeDemoMaintenance(cached);
       localStore.set(STORAGE_KEYS.MAINTENANCE, sanitized);
-      if (userEntered || sanitized.length > 0) return sanitized;
+      return sanitized;
     }
   } catch (err) {
     console.warn('[MaintenanceStore] Error reading storage:', err);
   }
 
-  if (userEntered) return [];
-  return INITIAL_MAINTENANCE;
+  // Initial for new user starts completely at 0 items!
+  return [];
 }
 
 export function saveStoredMaintenance(items: MaintenanceItem[]): boolean {

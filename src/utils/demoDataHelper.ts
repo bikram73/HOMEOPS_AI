@@ -54,27 +54,45 @@ export function setEnteredUserDetails(entered: boolean): void {
 }
 
 export function isDemoTask(t: TaskItem): boolean {
-  return DEMO_TASK_IDS.has(t.id);
+  if (!t || !t.id) return false;
+  if (DEMO_TASK_IDS.has(t.id)) return true;
+  if (t.id.startsWith('demo-') || t.id.startsWith('seed-')) return true;
+  return false;
 }
 
 export function isDemoInventory(i: InventoryItem): boolean {
-  return DEMO_INVENTORY_IDS.has(i.id);
+  if (!i || !i.id) return false;
+  if (DEMO_INVENTORY_IDS.has(i.id)) return true;
+  if (i.id.startsWith('demo-') || i.id.startsWith('seed-')) return true;
+  return false;
 }
 
 export function isDemoShopping(s: ShoppingItem): boolean {
-  return DEMO_SHOPPING_IDS.has(s.id);
+  if (!s || !s.id) return false;
+  if (DEMO_SHOPPING_IDS.has(s.id)) return true;
+  if (s.id.startsWith('demo-') || s.id.startsWith('seed-')) return true;
+  return false;
 }
 
 export function isDemoBill(b: BillItem): boolean {
-  return DEMO_BILL_IDS.has(b.id);
+  if (!b || !b.id) return false;
+  if (DEMO_BILL_IDS.has(b.id)) return true;
+  if (b.id.startsWith('demo-') || b.id.startsWith('seed-')) return true;
+  return false;
 }
 
 export function isDemoMaintenance(m: MaintenanceItem): boolean {
-  return DEMO_MAINTENANCE_IDS.has(m.id);
+  if (!m || !m.id) return false;
+  if (DEMO_MAINTENANCE_IDS.has(m.id)) return true;
+  if (m.id.startsWith('demo-') || m.id.startsWith('seed-')) return true;
+  return false;
 }
 
 export function isDemoActivity(a: ActivityEvent): boolean {
-  return DEMO_ACTIVITY_IDS.has(a.id);
+  if (!a || !a.id) return false;
+  if (DEMO_ACTIVITY_IDS.has(a.id)) return true;
+  if (a.id.startsWith('demo-') || a.id.startsWith('seed-') || a.id.startsWith('act-')) return true;
+  return false;
 }
 
 /**

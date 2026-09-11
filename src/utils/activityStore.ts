@@ -213,26 +213,20 @@ let cachedActivities: ActivityEvent[] | null = null;
 import { hasEnteredUserDetails, removeDemoActivities } from './demoDataHelper';
 
 /**
- * Load all activities from IndexedDB (or fallback to seed if user has not entered details)
+ * Load all activities from IndexedDB.
+ * Defaults to 0 activities ([]) for new users.
  */
 export async function getAllActivities(): Promise<ActivityEvent[]> {
-  const userEnteredDetails = hasEnteredUserDetails();
-
   if (cachedActivities !== null) {
-    if (userEnteredDetails) {
-      const sanitized = removeDemoActivities(cachedActivities);
-      cachedActivities = sanitized;
-      return sanitized;
-    }
-    if (cachedActivities.length > 0) {
-      return cachedActivities;
-    }
+    const sanitized = removeDemoActivities(cachedActivities);
+    cachedActivities = sanitized;
+    return sanitized;
   }
 
   try {
     const stored = await idbGet<ActivityEvent[]>(STORES.ACTIVITIES, ACTIVITIES_RECORD_KEY);
     if (stored && Array.isArray(stored)) {
-      const sanitized = userEnteredDetails ? removeDemoActivities(stored) : stored;
+      const sanitized = removeDemoActivities(stored);
       cachedActivities = sanitized;
       return sanitized;
     }
@@ -240,21 +234,8 @@ export async function getAllActivities(): Promise<ActivityEvent[]> {
     console.warn('[ActivityStore] Failed to fetch from IndexedDB:', err);
   }
 
-  // If user entered details, start clean — do not show seed demo activities!
-  if (userEnteredDetails) {
-    cachedActivities = [];
-    return [];
-  }
-
-  // First time initialization: use realistic seed history (only shown in initial demo mode)
-  const initial = getInitialSeedActivities();
-  cachedActivities = initial;
-  // Save asynchronously to IndexedDB
-  idbSet(STORES.ACTIVITIES, ACTIVITIES_RECORD_KEY, initial).catch((e) =>
-    console.warn('[ActivityStore] Seed save error:', e)
-  );
-
-  return initial;
+  cachedActivities = [];
+  return [];
 }
 
 /**
@@ -332,6 +313,15 @@ export async function recordActivityEvent(
     await idbSet(STORES.ACTIVITIES, ACTIVITIES_RECORD_KEY, updated);
   } catch (err) {
     console.warn('[ActivityStore] Failed to write to IndexedDB:', err);
+  }
+
+  // Dispatch window event so CalendarView and other components reflect immediately
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('homeops_activity_recorded', {
+        detail: { activity: newEvent },
+      })
+    );
   }
 
   // Silent sync to server so Gemini / Caspian have fresh activity memory

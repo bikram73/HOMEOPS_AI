@@ -40,6 +40,27 @@ class StateManager {
 
   private getInitialSeedState(): HomeState {
     return {
+      tasks: [],
+      inventory: [],
+      shopping: [],
+      bills: [],
+      maintenance: [],
+      activities: [],
+      activityEvents: [],
+      analytics: {
+        activeUsers: 1,
+        messages: 0,
+        activeDays: 1,
+        tasksCreated: 0,
+        tasksCompleted: 0,
+        shoppingItems: 0,
+        aiPlansGenerated: 0,
+      },
+    };
+  }
+
+  private getLegacySeedState(): HomeState {
+    return {
       tasks: [
         {
           id: 'task-1',

@@ -70,6 +70,7 @@ export interface TaskItem {
   priority: TaskPriority;
   category: string;
   dueDate: string;
+  date?: string;
   amount?: string;
   provider?: string;
   completed: boolean;
@@ -90,6 +91,7 @@ export interface InventoryItem {
   currentLevelDetail?: string;
   estimatedRemaining?: string;
   lastRestocked?: string;
+  date?: string;
   avgUsage?: string;
 }
 
@@ -99,6 +101,8 @@ export interface ShoppingItem {
   category: string;
   quantity: string;
   checked: boolean;
+  date?: string;
+  dueDate?: string;
 }
 
 export interface BillItem {
@@ -106,6 +110,7 @@ export interface BillItem {
   name: string;
   amount: string;
   dueDate: string;
+  date?: string;
   dueCategory: 'Due Tomorrow' | 'Due Soon' | 'Paid' | 'Upcoming';
   isAutoPay?: boolean;
   icon: string;
@@ -119,6 +124,7 @@ export interface MaintenanceItem {
   interval: string;
   lastDone: string;
   nextDue: string;
+  date?: string;
   status: 'Due Soon' | 'Optimal' | 'Overdue';
   icon: string;
 }

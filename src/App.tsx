@@ -667,44 +667,74 @@ export function App() {
     }
   };
 
-  const handleAddShoppingItem = async (name: string, category: string, date?: string) => {
-    const exists = shoppingItems.find((s) => s.name.toLowerCase() === name.toLowerCase());
-    if (exists) return;
+  const handleAddShoppingItem = async (name: string, category: string, date?: string, quantity?: string) => {
+    const existingIndex = shoppingItems.findIndex((s) => s.name.toLowerCase() === name.toLowerCase());
 
-    let baseShopping = shoppingItems;
-    if (!hasEnteredUserDetails()) {
-      setEnteredUserDetails(true);
-      baseShopping = removeDemoShopping(shoppingItems);
+    let updated: ShoppingItem[];
+    let targetItem: ShoppingItem;
+    const itemDate = date || getLocalDateString();
+
+    if (existingIndex !== -1) {
+      const existing = shoppingItems[existingIndex];
+      // Increment quantity if already on the list
+      let newQty = quantity || '2';
+      if (!quantity) {
+        const numMatch = existing.quantity.match(/^(\d+)(.*)$/);
+        if (numMatch) {
+          const count = parseInt(numMatch[1], 10) + 1;
+          const rest = numMatch[2] || '';
+          newQty = `${count}${rest}`;
+        } else {
+          newQty = `${existing.quantity} (+1)`;
+        }
+      }
+
+      targetItem = {
+        ...existing,
+        checked: false, // Ensure item is marked active/unbought
+        quantity: newQty,
+        category: category || existing.category,
+        date: itemDate,
+      };
+
+      updated = [...shoppingItems];
+      updated[existingIndex] = targetItem;
+    } else {
+      let baseShopping = shoppingItems;
+      if (!hasEnteredUserDetails()) {
+        setEnteredUserDetails(true);
+        baseShopping = removeDemoShopping(shoppingItems);
+      }
+
+      targetItem = {
+        id: `shop-${Date.now()}`,
+        name,
+        category,
+        quantity: quantity || '1',
+        checked: false,
+        date: itemDate,
+      };
+
+      updated = [...baseShopping, targetItem];
     }
 
-    const itemDate = date || getLocalDateString();
-    const newItem: ShoppingItem = {
-      id: `shop-${Date.now()}`,
-      name,
-      category,
-      quantity: '1',
-      checked: false,
-      date: itemDate,
-    };
-
-    const updated = [...baseShopping, newItem];
     setShoppingItems(updated);
     saveStoredShopping(updated);
 
     recordActivityEvent({
       type: 'shopping',
-      action: 'shopping_item_added',
-      title: `Added to shopping list: ${name}`,
-      description: `Category: ${category}`,
+      action: existingIndex !== -1 ? 'shopping_item_updated' : 'shopping_item_added',
+      title: `${existingIndex !== -1 ? 'Updated' : 'Added to'} shopping list: ${name}`,
+      description: `Category: ${category} • Qty: ${targetItem.quantity}`,
       date: itemDate,
       source: 'user',
       entityType: 'shopping',
-      entityId: newItem.id,
+      entityId: targetItem.id,
       entityName: name,
     });
 
     try {
-      await api.addShoppingItem(name, '1', category);
+      await api.addShoppingItem(name, targetItem.quantity, category);
       syncServerState();
     } catch (e) {
       console.error(e);
@@ -949,6 +979,7 @@ export function App() {
             {activeTab === 'inventory' && (
               <InventoryView
                 inventory={inventory}
+                shoppingItems={shoppingItems}
                 onAddInventoryItem={handleAddInventoryItem}
                 onDeleteInventoryItem={handleDeleteInventoryItem}
                 onAddToShoppingList={handleAddShoppingItem}
@@ -1083,6 +1114,7 @@ export function App() {
               {activeTab === 'inventory' && (
                 <InventoryView
                   inventory={inventory}
+                  shoppingItems={shoppingItems}
                   onAddInventoryItem={handleAddInventoryItem}
                   onDeleteInventoryItem={handleDeleteInventoryItem}
                   onAddToShoppingList={handleAddShoppingItem}

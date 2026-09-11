@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
-import { InventoryItem } from '../types';
+import { InventoryItem, ShoppingItem } from '../types';
 
 interface InventoryViewProps {
   inventory: InventoryItem[];
+  shoppingItems?: ShoppingItem[];
   onAddInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
   onDeleteInventoryItem: (id: string) => void;
-  onAddToShoppingList: (name: string, category: string) => void;
+  onAddToShoppingList: (name: string, category: string, date?: string, quantity?: string) => void;
   onUpdateAvailability: (id: string, delta: number) => void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
   inventory,
+  shoppingItems = [],
   onAddInventoryItem,
   onDeleteInventoryItem,
   onAddToShoppingList,
@@ -19,6 +21,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [selectedId, setSelectedId] = useState<string>(inventory[1]?.id || inventory[0]?.id || '');
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -29,6 +32,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [badge, setBadge] = useState<'Staple' | 'Low' | 'Normal'>('Normal');
 
   const selectedItem = inventory.find((i) => i.id === selectedId) || inventory[0];
+  const isJustAdded = selectedItem ? justAddedId === selectedItem.id : false;
+  const existingShoppingItem = selectedItem
+    ? shoppingItems.find(
+        (s) => s.name.toLowerCase() === selectedItem.name.toLowerCase() && !s.checked
+      )
+    : undefined;
 
   const handleCreateItem = (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,17 +64,33 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   const handleAddSelectedToShopping = (item: InventoryItem) => {
-    onAddToShoppingList(item.name, item.category);
-    setToastMsg(`Added "${item.name}" to Shopping List`);
-    setTimeout(() => setToastMsg(null), 3500);
+    if (!item) return;
+    const existing = shoppingItems.find(
+      (s) => s.name.toLowerCase() === item.name.toLowerCase()
+    );
+    const refillCategory = `${item.category} • Refill (${item.unit || item.subLocation || '1 pk'})`;
+    
+    onAddToShoppingList(item.name, refillCategory, undefined, item.unit || '1');
+    setJustAddedId(item.id);
+    
+    if (existing) {
+      setToastMsg(`Updated "${item.name}" quantity in Shopping List (+1)`);
+    } else {
+      setToastMsg(`Added "${item.name}" to Shopping List`);
+    }
+    
+    setTimeout(() => {
+      setToastMsg(null);
+      setJustAddedId(null);
+    }, 3000);
   };
 
   return (
     <div className="flex-1 p-6 md:p-10 max-w-[1440px] mx-auto w-full overflow-y-auto animate-in fade-in duration-200">
       {/* Toast Alert */}
       {toastMsg && (
-        <div className="fixed top-18 right-8 z-50 bg-[#0F766E] text-white px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-top-4">
-          <span className="material-symbols-outlined text-[20px]">check_circle</span>
+        <div className="fixed top-20 right-6 z-50 bg-[#0F766E] text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-top-4 border border-teal-500/40">
+          <span className="material-symbols-outlined text-[20px] text-teal-200">check_circle</span>
           <span className="text-sm font-medium">{toastMsg}</span>
         </div>
       )}
@@ -322,14 +347,34 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
               <div className="p-5 bg-gray-50/70 border-t border-[#e2e8f0] flex flex-col sm:flex-row gap-2.5">
                 <button
                   id="btn-add-item-to-shopping"
+                  type="button"
                   onClick={() => handleAddSelectedToShopping(selectedItem)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-[#e2e8f0] text-[#0F172A] px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
+                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-xs cursor-pointer active:scale-98 ${
+                    isJustAdded
+                      ? 'bg-emerald-600 text-white border border-emerald-700 shadow-sm'
+                      : existingShoppingItem
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                      : 'bg-white border border-[#e2e8f0] text-[#0F172A] hover:bg-gray-50'
+                  }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
-                  Add to Shopping
+                  <span className="material-symbols-outlined text-[18px]">
+                    {isJustAdded
+                      ? 'check_circle'
+                      : existingShoppingItem
+                      ? 'playlist_add_check'
+                      : 'add_shopping_cart'}
+                  </span>
+                  <span>
+                    {isJustAdded
+                      ? 'Added to Shopping!'
+                      : existingShoppingItem
+                      ? `On List (${existingShoppingItem.quantity}) • Add More`
+                      : 'Add to Shopping'}
+                  </span>
                 </button>
                 <button
                   id="btn-delete-selected-item"
+                  type="button"
                   onClick={() => onDeleteInventoryItem(selectedItem.id)}
                   className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition-colors cursor-pointer"
                   title="Delete inventory item"

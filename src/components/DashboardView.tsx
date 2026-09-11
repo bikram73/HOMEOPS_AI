@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, UserProfile } from '../types';
+import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, MaintenanceItem, UserProfile } from '../types';
 import { HERO_IMAGE_URL } from '../data/mockData';
-import { Sparkles, Calendar, Zap, MessageSquare } from 'lucide-react';
+import { Sparkles, Calendar, Zap, MessageSquare, Trash2, RotateCcw } from 'lucide-react';
 import { ReturningUserGreeting } from './ReturningUserGreeting';
 import { getTimeGreeting } from '../utils/timeGreeting';
+import { hasEnteredUserDetails } from '../utils/demoDataHelper';
 
 interface DashboardViewProps {
   tasks: TaskItem[];
@@ -11,6 +12,7 @@ interface DashboardViewProps {
   inventory: InventoryItem[];
   shoppingItems?: ShoppingItem[];
   bills?: BillItem[];
+  maintenance?: MaintenanceItem[];
   userProfile?: UserProfile | null;
   setActiveTab: (tab: PageTab) => void;
   onAddAllLowToShopping: () => void;
@@ -19,6 +21,7 @@ interface DashboardViewProps {
   onOpenBriefingModal?: () => void;
   onOpenWeeklyPlanModal?: () => void;
   onOpenCaspianModal?: () => void;
+  onClearAllDemoData?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -27,6 +30,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   inventory,
   shoppingItems = [],
   bills = [],
+  maintenance = [],
   userProfile,
   setActiveTab,
   onAddAllLowToShopping,
@@ -35,11 +39,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenBriefingModal,
   onOpenWeeklyPlanModal,
   onOpenCaspianModal,
+  onClearAllDemoData,
 }) => {
   const [isAiCardDismissed, setIsAiCardDismissed] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   const timeInfo = getTimeGreeting();
+  const isReturningUser = hasEnteredUserDetails() && !!userProfile?.name;
 
   // Priority tasks filter
   const priorityTasks = tasks.slice(0, 4);
@@ -144,16 +150,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Returning User Quick Status Overview */}
-      <ReturningUserGreeting
-        profile={userProfile || null}
-        tasks={tasks}
-        inventory={inventory}
-        shoppingItems={shoppingItems}
-        bills={bills}
-        onOpenWhatNowModal={onOpenWhatNowModal || (() => {})}
-        onOpenBriefingModal={onOpenBriefingModal || (() => {})}
-      />
+      {/* Returning User Quick Status Overview - ONLY rendered if user has saved details; removed for any new user */}
+      {isReturningUser ? (
+        <ReturningUserGreeting
+          profile={userProfile || null}
+          tasks={tasks}
+          inventory={inventory}
+          shoppingItems={shoppingItems}
+          bills={bills}
+          maintenance={maintenance}
+          onOpenWhatNowModal={onOpenWhatNowModal || (() => {})}
+          onOpenBriefingModal={onOpenBriefingModal || (() => {})}
+        />
+      ) : onClearAllDemoData ? (
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#E6F4F1] flex items-center justify-center text-[#0F766E]">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-[#0F172A]">New User Setup</p>
+              <p className="text-xs text-gray-500">
+                Adding your own task, inventory, shopping item, bill, or maintenance automatically removes all sample data.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClearAllDemoData}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-red-600 transition-colors flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Start Fresh (Clean Slate)</span>
+          </button>
+        </div>
+      ) : null}
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">

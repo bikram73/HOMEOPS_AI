@@ -8,6 +8,8 @@ interface ShoppingBillsViewProps {
   onDeleteShoppingItem: (id: string) => void;
   onAddShoppingItem: (name: string, category: string) => void;
   onPayBill: (billId: string) => void;
+  onAddBill?: (bill: Omit<BillItem, 'id'>) => void;
+  onDeleteBill?: (id: string) => void;
 }
 
 export const ShoppingBillsView: React.FC<ShoppingBillsViewProps> = ({
@@ -17,13 +19,24 @@ export const ShoppingBillsView: React.FC<ShoppingBillsViewProps> = ({
   onDeleteShoppingItem,
   onAddShoppingItem,
   onPayBill,
+  onAddBill,
+  onDeleteBill,
 }) => {
   const [showNewItemModal, setShowNewItemModal] = useState(false);
+  const [showNewBillModal, setShowNewBillModal] = useState(false);
   const [newItemName, setNewItemName] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('Pantry');
   const [oliveOilAdded, setOliveOilAdded] = useState(false);
   const [filterMode, setFilterMode] = useState<'all' | 'unbought' | 'bought'>('all');
   const [payingBillId, setPayingBillId] = useState<string | null>(null);
+
+  // New Bill Form States
+  const [billName, setBillName] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [billDueDate, setBillDueDate] = useState('');
+  const [billCategory, setBillCategory] = useState<'Due Tomorrow' | 'Due Soon' | 'Upcoming'>('Due Soon');
+  const [billIcon, setBillIcon] = useState('receipt_long');
+  const [billAutoPay, setBillAutoPay] = useState(false);
 
   const filteredShopping = shoppingItems.filter((item) => {
     if (filterMode === 'unbought') return !item.checked;
@@ -46,6 +59,26 @@ export const ShoppingBillsView: React.FC<ShoppingBillsViewProps> = ({
     onAddShoppingItem(newItemName.trim(), `${newItemCategory} • Standard Pack`);
     setNewItemName('');
     setShowNewItemModal(false);
+  };
+
+  const handleCreateBillSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billName.trim() || !billAmount.trim()) return;
+    if (onAddBill) {
+      onAddBill({
+        name: billName.trim(),
+        amount: billAmount.startsWith('$') || billAmount.startsWith('₹') ? billAmount : `$${billAmount}`,
+        dueDate: billDueDate.trim() || 'Upcoming',
+        dueCategory: billCategory,
+        isAutoPay: billAutoPay,
+        icon: billIcon || 'receipt_long',
+        paidThisMonth: false,
+      });
+    }
+    setBillName('');
+    setBillAmount('');
+    setBillDueDate('');
+    setShowNewBillModal(false);
   };
 
   const handlePayNow = (bill: BillItem) => {
@@ -226,72 +259,123 @@ export const ShoppingBillsView: React.FC<ShoppingBillsViewProps> = ({
                 <span className="material-symbols-outlined text-[#0F172A] text-[22px]">
                   receipt_long
                 </span>
-                Upcoming Bills
+                Bills &amp; Payments
               </h3>
+              {onAddBill && (
+                <button
+                  id="btn-open-add-bill"
+                  type="button"
+                  onClick={() => setShowNewBillModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F766E] hover:bg-[#115E59] text-white text-xs font-semibold shadow-xs cursor-pointer transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">add</span>
+                  Add Bill
+                </button>
+              )}
             </div>
 
             <div className="space-y-4">
-              {/* Electricity Bill Card */}
-              <div className="p-4 border border-[#ffdad6] bg-[#ffdad6]/10 rounded-xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-[#ba1a1a]"></div>
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#e0e3e5] flex items-center justify-center text-[#0F172A]">
-                      <span className="material-symbols-outlined text-[20px]">bolt</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#0F172A]">Electricity</p>
-                      <p className="text-xs text-[#ba1a1a] font-semibold">Due Tomorrow</p>
-                    </div>
-                  </div>
-                  <p className="text-lg font-bold text-[#0F172A]">₹1,850</p>
+              {bills.length === 0 ? (
+                <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-xl">
+                  <span className="material-symbols-outlined text-gray-300 text-4xl mb-2">receipt_long</span>
+                  <p className="text-sm font-semibold text-[#0F172A]">No Bills Recorded</p>
+                  <p className="text-xs text-gray-500 mt-1 mb-3">Add utilities, rent, subscriptions, or property dues.</p>
+                  {onAddBill && (
+                    <button
+                      onClick={() => setShowNewBillModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0F766E] text-white text-xs font-semibold hover:bg-[#115E59] cursor-pointer"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      Add First Bill
+                    </button>
+                  )}
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    id="btn-pay-electricity-bill"
-                    disabled={payingBillId === 'bill-1'}
-                    onClick={() =>
-                      handlePayNow(
-                        bills.find((b) => b.id === 'bill-1') || {
-                          id: 'bill-1',
-                          name: 'Electricity',
-                          amount: '₹1,850',
-                          dueDate: 'Due Tomorrow',
-                          dueCategory: 'Due Tomorrow',
-                          icon: 'bolt',
-                        }
-                      )
-                    }
-                    className="flex-1 bg-[#0f172a] hover:bg-[#1e293b] text-white py-2 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-                  >
-                    {payingBillId === 'bill-1' ? (
-                      <>
-                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      'Pay Now'
-                    )}
-                  </button>
-                </div>
-              </div>
+              ) : (
+                bills.map((bill) => {
+                  const isDueSoon = bill.dueCategory === 'Due Tomorrow' || bill.dueCategory === 'Due Soon';
+                  const isPaid = bill.paidThisMonth || bill.dueCategory === 'Paid';
+                  const isPaying = payingBillId === bill.id;
 
-              {/* Internet Bill Card */}
-              <div className="p-4 border border-[#e2e8f0] bg-[#f8fafc] rounded-xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-1.5 h-full bg-[#131b2e]/60"></div>
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-[#e0e3e5] flex items-center justify-center text-[#0F172A]">
-                      <span className="material-symbols-outlined text-[20px]">wifi</span>
+                  return (
+                    <div
+                      key={bill.id}
+                      id={`bill-card-${bill.id}`}
+                      className={`p-4 border rounded-xl relative overflow-hidden transition-all ${
+                        isPaid
+                          ? 'border-emerald-200 bg-emerald-50/40'
+                          : isDueSoon
+                          ? 'border-[#ffdad6] bg-[#ffdad6]/15'
+                          : 'border-[#e2e8f0] bg-[#f8fafc]'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-0 left-0 w-1.5 h-full ${
+                          isPaid ? 'bg-emerald-500' : isDueSoon ? 'bg-[#ba1a1a]' : 'bg-[#131b2e]/60'
+                        }`}
+                      ></div>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-full flex items-center justify-center ${
+                              isPaid
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-[#e0e3e5] text-[#0F172A]'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined text-[20px]">{bill.icon || 'receipt_long'}</span>
+                          </div>
+                          <div>
+                            <p className={`text-sm font-bold ${isPaid ? 'text-gray-600 line-through' : 'text-[#0F172A]'}`}>
+                              {bill.name}
+                            </p>
+                            <p
+                              className={`text-xs font-semibold ${
+                                isPaid ? 'text-emerald-700' : isDueSoon ? 'text-[#ba1a1a]' : 'text-gray-500'
+                              }`}
+                            >
+                              {isPaid ? 'Paid' : bill.dueDate} {bill.isAutoPay ? '• Auto-pay' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-base md:text-lg font-bold text-[#0F172A]">{bill.amount}</p>
+                          {onDeleteBill && (
+                            <button
+                              id={`btn-delete-bill-${bill.id}`}
+                              type="button"
+                              onClick={() => onDeleteBill(bill.id)}
+                              className="text-gray-300 hover:text-red-600 p-1 rounded transition-colors cursor-pointer"
+                              title={`Delete ${bill.name}`}
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {!isPaid && (
+                        <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200/50">
+                          <button
+                            id={`btn-pay-${bill.id}`}
+                            disabled={isPaying}
+                            onClick={() => handlePayNow(bill)}
+                            className="flex-1 bg-[#0f172a] hover:bg-[#1e293b] text-white py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                          >
+                            {isPaying ? (
+                              <>
+                                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                Processing...
+                              </>
+                            ) : (
+                              'Mark Paid'
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-[#0F172A]">Internet</p>
-                      <p className="text-xs text-gray-500">Due in 5 days (Auto-pay)</p>
-                    </div>
-                  </div>
-                  <p className="text-lg font-bold text-[#0F172A]">₹999</p>
-                </div>
-              </div>
+                  );
+                })
+              )}
             </div>
           </section>
         </div>
@@ -344,15 +428,137 @@ export const ShoppingBillsView: React.FC<ShoppingBillsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowNewItemModal(false)}
-                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50"
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-semibold hover:bg-[#115E59]"
+                  className="flex-1 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-semibold hover:bg-[#115E59] cursor-pointer"
                 >
                   Add to List
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* New Bill Modal */}
+      {showNewBillModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e2e8f0] space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-bold text-[#0F172A]">Add Household Bill</h3>
+              <button
+                onClick={() => setShowNewBillModal(false)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            <form onSubmit={handleCreateBillSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Bill Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Electricity, Water, Internet, Rent"
+                  value={billName}
+                  onChange={(e) => setBillName(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Amount *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. $120 or ₹1,850"
+                    value={billAmount}
+                    onChange={(e) => setBillAmount(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Due Schedule
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Due Tomorrow, 15th of month"
+                    value={billDueDate}
+                    onChange={(e) => setBillDueDate(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Urgency Category</label>
+                  <select
+                    value={billCategory}
+                    onChange={(e) => setBillCategory(e.target.value as any)}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                  >
+                    <option value="Due Soon">Due Soon</option>
+                    <option value="Due Tomorrow">Due Tomorrow</option>
+                    <option value="Upcoming">Upcoming</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Icon</label>
+                  <select
+                    value={billIcon}
+                    onChange={(e) => setBillIcon(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm"
+                  >
+                    <option value="bolt">Electricity (bolt)</option>
+                    <option value="wifi">Internet (wifi)</option>
+                    <option value="water_drop">Water (water_drop)</option>
+                    <option value="home">Rent / Mortgage (home)</option>
+                    <option value="tv">Streaming (tv)</option>
+                    <option value="security">Insurance (security)</option>
+                    <option value="receipt_long">General Bill</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="checkbox-bill-autopay"
+                  checked={billAutoPay}
+                  onChange={(e) => setBillAutoPay(e.target.checked)}
+                  className="rounded text-[#0F766E] focus:ring-[#0F766E]"
+                />
+                <label htmlFor="checkbox-bill-autopay" className="text-xs text-gray-700 font-medium cursor-pointer">
+                  Auto-pay enabled for this bill
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewBillModal(false)}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-semibold hover:bg-[#115E59] cursor-pointer"
+                >
+                  Save Bill
                 </button>
               </div>
             </form>

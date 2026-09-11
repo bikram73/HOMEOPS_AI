@@ -4,6 +4,7 @@ import { InventoryItem } from '../types';
 interface InventoryViewProps {
   inventory: InventoryItem[];
   onAddInventoryItem: (item: Omit<InventoryItem, 'id'>) => void;
+  onDeleteInventoryItem: (id: string) => void;
   onAddToShoppingList: (name: string, category: string) => void;
   onUpdateAvailability: (id: string, delta: number) => void;
 }
@@ -11,6 +12,7 @@ interface InventoryViewProps {
 export const InventoryView: React.FC<InventoryViewProps> = ({
   inventory,
   onAddInventoryItem,
+  onDeleteInventoryItem,
   onAddToShoppingList,
   onUpdateAvailability,
 }) => {
@@ -92,77 +94,108 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Inventory Cards Grid (Left 8-9 cols) */}
         <div className="md:col-span-8 lg:col-span-8 xl:col-span-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {inventory.map((item) => {
-            const isSelected = selectedItem?.id === item.id;
-            const isLow = item.availability <= 30;
-
-            return (
-              <div
-                key={item.id}
-                id={`inventory-card-${item.id}`}
-                onClick={() => setSelectedId(item.id)}
-                className={`bg-white rounded-xl p-5 md:p-6 shadow-sm transition-all duration-200 relative cursor-pointer flex flex-col h-full group ${
-                  isSelected
-                    ? 'border-2 border-[#0F766E] shadow-md ring-2 ring-[#0F766E]/10'
-                    : isLow
-                    ? 'border border-[#ffdad6] hover:border-red-400'
-                    : 'border border-[#e2e8f0] hover:border-gray-400'
-                }`}
+          {inventory.length === 0 ? (
+            <div className="col-span-full bg-white border border-[#e2e8f0] rounded-xl p-12 text-center flex flex-col items-center justify-center">
+              <span className="material-symbols-outlined text-gray-300 text-5xl mb-3">inventory_2</span>
+              <h3 className="text-lg font-bold text-[#0F172A] mb-1">No Inventory Items</h3>
+              <p className="text-sm text-gray-500 max-w-sm mb-4">
+                Your inventory is currently empty. Add your household staples, groceries, or supplies to track availability.
+              </p>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center gap-2 bg-[#0F766E] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#115E59]"
               >
-                {/* Card Top Row */}
-                <div className="flex justify-between items-start mb-4">
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-                      isLow
-                        ? 'bg-[#ffdad6]/40 text-[#ba1a1a] group-hover:bg-[#ffdad6]/70'
-                        : 'bg-[#f1f5f9] text-gray-600 group-hover:text-[#0F172A]'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
-                  </div>
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Add First Item
+              </button>
+            </div>
+          ) : (
+            inventory.map((item) => {
+              const isSelected = selectedItem?.id === item.id;
+              const isLow = item.availability <= 30;
 
-                  {item.badge === 'Staple' && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#e2e8f0] text-[#0F172A] text-[10px] font-bold uppercase tracking-wider">
-                      Staple
-                    </span>
-                  )}
-                  {isLow && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#ffdad6] text-[#93000a] text-[10px] font-bold uppercase tracking-wider gap-1">
-                      <span className="material-symbols-outlined text-[12px]">warning</span> Low
-                    </span>
-                  )}
-                </div>
-
-                {/* Card Title & Location */}
-                <h3 className="text-base md:text-lg font-bold text-[#0F172A] mb-1 group-hover:text-[#0F766E] transition-colors">
-                  {item.name}
-                </h3>
-                <p className="text-xs text-gray-500 mb-6">{item.location}</p>
-
-                {/* Availability Bar & Level Controls */}
-                <div className="mt-auto pt-2">
-                  <div className="flex justify-between text-xs font-semibold mb-2">
-                    <span className="text-gray-500">Availability</span>
-                    <span className={isLow ? 'text-[#ba1a1a]' : 'text-gray-800'}>
-                      {item.availability}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-[#e2e8f0] rounded-full h-2 overflow-hidden">
+              return (
+                <div
+                  key={item.id}
+                  id={`inventory-card-${item.id}`}
+                  onClick={() => setSelectedId(item.id)}
+                  className={`bg-white rounded-xl p-5 md:p-6 shadow-sm transition-all duration-200 relative cursor-pointer flex flex-col h-full group ${
+                    isSelected
+                      ? 'border-2 border-[#0F766E] shadow-md ring-2 ring-[#0F766E]/10'
+                      : isLow
+                      ? 'border border-[#ffdad6] hover:border-red-400'
+                      : 'border border-[#e2e8f0] hover:border-gray-400'
+                  }`}
+                >
+                  {/* Card Top Row */}
+                  <div className="flex justify-between items-start mb-4">
                     <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
                         isLow
-                          ? 'bg-[#ba1a1a]'
-                          : item.availability >= 70
-                          ? 'bg-[#006a63]'
-                          : 'bg-[#0284c7]'
+                          ? 'bg-[#ffdad6]/40 text-[#ba1a1a] group-hover:bg-[#ffdad6]/70'
+                          : 'bg-[#f1f5f9] text-gray-600 group-hover:text-[#0F172A]'
                       }`}
-                      style={{ width: `${item.availability}%` }}
-                    ></div>
+                    >
+                      <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {item.badge === 'Staple' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#e2e8f0] text-[#0F172A] text-[10px] font-bold uppercase tracking-wider">
+                          Staple
+                        </span>
+                      )}
+                      {isLow && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-[#ffdad6] text-[#93000a] text-[10px] font-bold uppercase tracking-wider gap-1">
+                          <span className="material-symbols-outlined text-[12px]">warning</span> Low
+                        </span>
+                      )}
+                      <button
+                        id={`btn-delete-inv-${item.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteInventoryItem(item.id);
+                        }}
+                        className="opacity-60 hover:opacity-100 p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title={`Delete ${item.name}`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Card Title & Location */}
+                  <h3 className="text-base md:text-lg font-bold text-[#0F172A] mb-1 group-hover:text-[#0F766E] transition-colors">
+                    {item.name}
+                  </h3>
+                  <p className="text-xs text-gray-500 mb-6">{item.location}</p>
+
+                  {/* Availability Bar & Level Controls */}
+                  <div className="mt-auto pt-2">
+                    <div className="flex justify-between text-xs font-semibold mb-2">
+                      <span className="text-gray-500">Availability</span>
+                      <span className={isLow ? 'text-[#ba1a1a]' : 'text-gray-800'}>
+                        {item.availability}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#e2e8f0] rounded-full h-2 overflow-hidden">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          isLow
+                            ? 'bg-[#ba1a1a]'
+                            : item.availability >= 70
+                            ? 'bg-[#006a63]'
+                            : 'bg-[#0284c7]'
+                        }`}
+                        style={{ width: `${item.availability}%` }}
+                      ></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* Right Sidebar Area (Detail Panel & Insights) */}
@@ -280,14 +313,23 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-5 bg-gray-50/70 border-t border-[#e2e8f0]">
+              <div className="p-5 bg-gray-50/70 border-t border-[#e2e8f0] flex flex-col sm:flex-row gap-2.5">
                 <button
                   id="btn-add-item-to-shopping"
                   onClick={() => handleAddSelectedToShopping(selectedItem)}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-white border border-[#e2e8f0] text-[#0F172A] px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs"
+                  className="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-[#e2e8f0] text-[#0F172A] px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
                 >
                   <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
                   Add to Shopping
+                </button>
+                <button
+                  id="btn-delete-selected-item"
+                  onClick={() => onDeleteInventoryItem(selectedItem.id)}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-sm font-semibold transition-colors cursor-pointer"
+                  title="Delete inventory item"
+                >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                  <span>Delete</span>
                 </button>
               </div>
             </div>

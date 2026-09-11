@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, ChatMessage } from './types';
+import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, MaintenanceItem, ChatMessage } from './types';
 import {
   INITIAL_TASKS,
   INITIAL_INVENTORY,
   INITIAL_SHOPPING,
   INITIAL_BILLS,
+  INITIAL_MAINTENANCE,
   INITIAL_CHAT,
   INITIAL_ACTIVITIES,
 } from './data/mockData';
@@ -55,6 +56,25 @@ import {
   saveStoredTasks,
   clearStoredTasks,
 } from './utils/taskStore';
+import {
+  getStoredInventory,
+  saveStoredInventory,
+  getStoredShopping,
+  saveStoredShopping,
+  getStoredBills,
+  saveStoredBills,
+  getStoredMaintenance,
+  saveStoredMaintenance,
+} from './utils/householdItemStores';
+import {
+  hasEnteredUserDetails,
+  setEnteredUserDetails,
+  removeDemoTasks,
+  removeDemoInventory,
+  removeDemoShopping,
+  removeDemoBills,
+  removeDemoMaintenance,
+} from './utils/demoDataHelper';
 import { recordActivityEvent } from './utils/activityStore';
 
 export function App() {
@@ -63,9 +83,10 @@ export function App() {
 
   // Application Data States - initialized synchronously from browser LocalStorage / Cookies / Cache
   const [tasks, setTasks] = useState<TaskItem[]>(() => getStoredTasks());
-  const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(INITIAL_SHOPPING);
-  const [bills, setBills] = useState<BillItem[]>(INITIAL_BILLS);
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredInventory());
+  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(() => getStoredShopping());
+  const [bills, setBills] = useState<BillItem[]>(() => getStoredBills());
+  const [maintenance, setMaintenance] = useState<MaintenanceItem[]>(() => getStoredMaintenance());
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>(INITIAL_CHAT);
   const [activities, setActivities] = useState(INITIAL_ACTIVITIES);
 
@@ -358,7 +379,13 @@ export function App() {
       ...newTask,
       id: localId,
     };
-    const updated = [item, ...tasks];
+
+    let baseTasks = tasks;
+    if (!hasEnteredUserDetails()) {
+      setEnteredUserDetails(true);
+      baseTasks = removeDemoTasks(tasks);
+    }
+    const updated = [item, ...baseTasks];
 
     // 1. Instantly update React state
     setTasks(updated);
@@ -434,7 +461,16 @@ export function App() {
       ...newItem,
       id: localId,
     };
-    setInventory((prev) => [item, ...prev]);
+
+    let baseInventory = inventory;
+    if (!hasEnteredUserDetails()) {
+      setEnteredUserDetails(true);
+      baseInventory = removeDemoInventory(inventory);
+    }
+    const updated = [item, ...baseInventory];
+    setInventory(updated);
+    saveStoredInventory(updated);
+
     try {
       await api.addInventoryItem({
         name: newItem.name,
@@ -449,21 +485,29 @@ export function App() {
     }
   };
 
+  const handleDeleteInventoryItem = (id: string) => {
+    const updated = inventory.filter((i) => i.id !== id);
+    setInventory(updated);
+    saveStoredInventory(updated);
+  };
+
   const handleUpdateAvailability = async (id: string, delta: number) => {
-    setInventory((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          const newLevel = Math.max(0, Math.min(100, item.availability + delta));
-          return {
-            ...item,
-            availability: newLevel,
-            badge: newLevel <= 30 ? 'Low' : item.badge === 'Staple' ? 'Staple' : 'Normal',
-            currentLevelDetail: `${newLevel}% ${newLevel <= 30 ? '(Low)' : '(Adequate)'}`,
-          };
-        }
-        return item;
-      })
-    );
+    const updated = inventory.map((item) => {
+      if (item.id === id) {
+        const newLevel = Math.max(0, Math.min(100, item.availability + delta));
+        return {
+          ...item,
+          availability: newLevel,
+          badge: newLevel <= 30 ? 'Low' : item.badge === 'Staple' ? 'Staple' : 'Normal',
+          currentLevelDetail: `${newLevel}% ${newLevel <= 30 ? '(Low)' : '(Adequate)'}`,
+        };
+      }
+      return item;
+    });
+
+    setInventory(updated);
+    saveStoredInventory(updated);
+
     try {
       const item = inventory.find((i) => i.id === id);
       if (item) {
@@ -484,9 +528,10 @@ export function App() {
   const handleToggleShopping = async (id: string) => {
     const item = shoppingItems.find((s) => s.id === id);
     const newStatus = !item?.checked;
-    setShoppingItems((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, checked: newStatus } : s))
-    );
+    const updated = shoppingItems.map((s) => (s.id === id ? { ...s, checked: newStatus } : s));
+    setShoppingItems(updated);
+    saveStoredShopping(updated);
+
     try {
       await api.toggleShoppingItem(id, newStatus);
       syncServerState();
@@ -496,7 +541,10 @@ export function App() {
   };
 
   const handleDeleteShopping = async (id: string) => {
-    setShoppingItems((prev) => prev.filter((s) => s.id !== id));
+    const updated = shoppingItems.filter((s) => s.id !== id);
+    setShoppingItems(updated);
+    saveStoredShopping(updated);
+
     try {
       await api.deleteShoppingItem(id);
       syncServerState();
@@ -509,16 +557,24 @@ export function App() {
     const exists = shoppingItems.find((s) => s.name.toLowerCase() === name.toLowerCase());
     if (exists) return;
 
-    setShoppingItems((prev) => [
-      ...prev,
-      {
-        id: `shop-${Date.now()}`,
-        name,
-        category,
-        quantity: '1',
-        checked: false,
-      },
-    ]);
+    let baseShopping = shoppingItems;
+    if (!hasEnteredUserDetails()) {
+      setEnteredUserDetails(true);
+      baseShopping = removeDemoShopping(shoppingItems);
+    }
+
+    const newItem: ShoppingItem = {
+      id: `shop-${Date.now()}`,
+      name,
+      category,
+      quantity: '1',
+      checked: false,
+    };
+
+    const updated = [...baseShopping, newItem];
+    setShoppingItems(updated);
+    saveStoredShopping(updated);
+
     try {
       await api.addShoppingItem(name, '1', category);
       syncServerState();
@@ -535,31 +591,117 @@ export function App() {
   };
 
   // Handlers for Bills
+  const handleAddBill = (newBill: Omit<BillItem, 'id'>) => {
+    let baseBills = bills;
+    if (!hasEnteredUserDetails()) {
+      setEnteredUserDetails(true);
+      baseBills = removeDemoBills(bills);
+    }
+
+    const item: BillItem = {
+      ...newBill,
+      id: `bill-${Date.now()}`,
+    };
+    const updated = [item, ...baseBills];
+    setBills(updated);
+    saveStoredBills(updated);
+  };
+
+  const handleDeleteBill = (billId: string) => {
+    const updated = bills.filter((b) => b.id !== billId);
+    setBills(updated);
+    saveStoredBills(updated);
+  };
+
   const handlePayBill = async (billId: string) => {
-    setBills((prev) =>
-      prev.map((b) =>
-        b.id === billId
-          ? {
-              ...b,
-              dueCategory: 'Paid',
-              paidThisMonth: true,
-              dueDate: 'Paid Just Now',
-            }
-          : b
-      )
+    const updated = bills.map((b) =>
+      b.id === billId
+        ? {
+            ...b,
+            dueCategory: 'Paid' as const,
+            paidThisMonth: true,
+            dueDate: 'Paid Just Now',
+          }
+        : b
     );
+    setBills(updated);
+    saveStoredBills(updated);
+
     // Also mark related task completed if it exists
-    setTasks((prev) =>
-      prev.map((t) =>
+    setTasks((prev) => {
+      const updatedTasks = prev.map((t) =>
         t.title.toLowerCase().includes('electricity') ? { ...t, completed: true } : t
-      )
-    );
+      );
+      saveStoredTasks(updatedTasks);
+      return updatedTasks;
+    });
+
     try {
       await api.payBill(billId);
       syncServerState();
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Handlers for Maintenance
+  const handleAddMaintenance = (newMaint: Omit<MaintenanceItem, 'id'>) => {
+    let baseMaint = maintenance;
+    if (!hasEnteredUserDetails()) {
+      setEnteredUserDetails(true);
+      baseMaint = removeDemoMaintenance(maintenance);
+    }
+
+    const item: MaintenanceItem = {
+      ...newMaint,
+      id: `m-${Date.now()}`,
+    };
+    const updated = [item, ...baseMaint];
+    setMaintenance(updated);
+    saveStoredMaintenance(updated);
+  };
+
+  const handleDeleteMaintenance = (id: string) => {
+    const updated = maintenance.filter((m) => m.id !== id);
+    setMaintenance(updated);
+    saveStoredMaintenance(updated);
+  };
+
+  const handleCompleteMaintenance = (id: string) => {
+    const updated = maintenance.map((m) =>
+      m.id === id
+        ? {
+            ...m,
+            status: 'Optimal' as const,
+            lastDone: 'Today',
+            nextDue: 'In 90 days',
+          }
+        : m
+    );
+    setMaintenance(updated);
+    saveStoredMaintenance(updated);
+  };
+
+  // Start fresh / Clear demo data
+  const handleClearAllDemoData = () => {
+    setEnteredUserDetails(true);
+    const cleanTasks = removeDemoTasks(tasks);
+    const cleanInv = removeDemoInventory(inventory);
+    const cleanShop = removeDemoShopping(shoppingItems);
+    const cleanBills = removeDemoBills(bills);
+    const cleanMaint = removeDemoMaintenance(maintenance);
+
+    setTasks(cleanTasks);
+    setInventory(cleanInv);
+    setShoppingItems(cleanShop);
+    setBills(cleanBills);
+    setMaintenance(cleanMaint);
+
+    saveStoredTasks(cleanTasks);
+    saveStoredInventory(cleanInv);
+    saveStoredShopping(cleanShop);
+    saveStoredBills(cleanBills);
+    saveStoredMaintenance(cleanMaint);
   };
 
   // AI Chat Handler
@@ -652,6 +794,7 @@ export function App() {
               <InventoryView
                 inventory={inventory}
                 onAddInventoryItem={handleAddInventoryItem}
+                onDeleteInventoryItem={handleDeleteInventoryItem}
                 onAddToShoppingList={handleAddShoppingItem}
                 onUpdateAvailability={handleUpdateAvailability}
               />
@@ -663,6 +806,8 @@ export function App() {
                 onToggleShoppingItem={handleToggleShopping}
                 onDeleteShoppingItem={handleDeleteShopping}
                 onAddShoppingItem={handleAddShoppingItem}
+                onAddBill={handleAddBill}
+                onDeleteBill={handleDeleteBill}
                 onPayBill={handlePayBill}
               />
             ) : null}
@@ -674,7 +819,14 @@ export function App() {
                 onRefreshState={syncServerState}
               />
             )}
-            {activeTab === 'maintenance' && <MaintenanceView />}
+            {activeTab === 'maintenance' && (
+              <MaintenanceView
+                maintenance={maintenance}
+                onAddMaintenance={handleAddMaintenance}
+                onDeleteMaintenance={handleDeleteMaintenance}
+                onCompleteMaintenance={handleCompleteMaintenance}
+              />
+            )}
             {activeTab === 'calendar' && (
               <CalendarView
                 tasks={tasks}
@@ -734,6 +886,8 @@ export function App() {
                   inventory={inventory}
                   shoppingItems={shoppingItems}
                   bills={bills}
+                  maintenance={maintenance}
+                  onClearAllDemoData={handleClearAllDemoData}
                   userProfile={userProfile}
                   setActiveTab={setActiveTab}
                   onAddAllLowToShopping={handleAddAllLowToShopping}
@@ -760,6 +914,7 @@ export function App() {
                 <InventoryView
                   inventory={inventory}
                   onAddInventoryItem={handleAddInventoryItem}
+                  onDeleteInventoryItem={handleDeleteInventoryItem}
                   onAddToShoppingList={handleAddShoppingItem}
                   onUpdateAvailability={handleUpdateAvailability}
                 />
@@ -772,6 +927,8 @@ export function App() {
                   onToggleShoppingItem={handleToggleShopping}
                   onDeleteShoppingItem={handleDeleteShopping}
                   onAddShoppingItem={handleAddShoppingItem}
+                  onAddBill={handleAddBill}
+                  onDeleteBill={handleDeleteBill}
                   onPayBill={handlePayBill}
                 />
               )}
@@ -785,7 +942,14 @@ export function App() {
                 />
               )}
 
-              {activeTab === 'maintenance' && <MaintenanceView />}
+              {activeTab === 'maintenance' && (
+                <MaintenanceView
+                  maintenance={maintenance}
+                  onAddMaintenance={handleAddMaintenance}
+                  onDeleteMaintenance={handleDeleteMaintenance}
+                  onCompleteMaintenance={handleCompleteMaintenance}
+                />
+              )}
 
               {activeTab === 'calendar' && (
                 <CalendarView

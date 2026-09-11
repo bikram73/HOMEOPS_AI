@@ -4,7 +4,15 @@
  * "initially show the demo thing, but when a user enters details,
  * don't show any already added demo things."
  */
-import { TaskItem, InventoryItem, ShoppingItem, BillItem, ActivityEvent, UserProfile } from '../types';
+import {
+  TaskItem,
+  InventoryItem,
+  ShoppingItem,
+  BillItem,
+  MaintenanceItem,
+  ActivityEvent,
+  UserProfile,
+} from '../types';
 import { localStore, cookieStore } from './storage';
 import { hasCompletedOnboarding } from './profileStore';
 
@@ -12,8 +20,9 @@ export const USER_DETAILS_ENTERED_KEY = 'homeops_user_details_entered';
 
 const DEMO_TASK_IDS = new Set(['task-1', 'task-2', 'task-3', 'task-4', 'task-5']);
 const DEMO_INVENTORY_IDS = new Set(['inv-1', 'inv-2', 'inv-3', 'inv-4', 'inv-5', 'inv-6']);
-const DEMO_SHOPPING_IDS = new Set(['shop-1', 'shop-2', 'shop-3']);
-const DEMO_BILL_IDS = new Set(['bill-1', 'bill-2', 'bill-3']);
+const DEMO_SHOPPING_IDS = new Set(['shop-1', 'shop-2', 'shop-3', 'shop-4']);
+const DEMO_BILL_IDS = new Set(['bill-1', 'bill-2', 'bill-3', 'bill-4', 'bill-5']);
+const DEMO_MAINTENANCE_IDS = new Set(['m-1', 'm-2', 'm-3', 'm-4']);
 const DEMO_ACTIVITY_IDS = new Set([
   'act-1',
   'act-2',
@@ -60,6 +69,10 @@ export function isDemoBill(b: BillItem): boolean {
   return DEMO_BILL_IDS.has(b.id);
 }
 
+export function isDemoMaintenance(m: MaintenanceItem): boolean {
+  return DEMO_MAINTENANCE_IDS.has(m.id);
+}
+
 export function isDemoActivity(a: ActivityEvent): boolean {
   return DEMO_ACTIVITY_IDS.has(a.id);
 }
@@ -81,6 +94,10 @@ export function removeDemoShopping(shopping: ShoppingItem[]): ShoppingItem[] {
 
 export function removeDemoBills(bills: BillItem[]): BillItem[] {
   return bills.filter((b) => !isDemoBill(b));
+}
+
+export function removeDemoMaintenance(maintenance: MaintenanceItem[]): MaintenanceItem[] {
+  return maintenance.filter((m) => !isDemoMaintenance(m));
 }
 
 export function removeDemoActivities(activities: ActivityEvent[]): ActivityEvent[] {

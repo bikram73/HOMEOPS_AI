@@ -3,6 +3,7 @@ import {
   InventoryItem,
   ShoppingItem,
   BillItem,
+  MaintenanceItem,
   TimelineItem,
   ActivityItem,
   ChatMessage,
@@ -223,6 +224,49 @@ export const INITIAL_BILLS: BillItem[] = [
     dueCategory: 'Paid',
     icon: 'security',
     paidThisMonth: true,
+  },
+];
+
+export const INITIAL_MAINTENANCE: MaintenanceItem[] = [
+  {
+    id: 'm-1',
+    title: 'HVAC Air Filter Replacement',
+    system: 'Heating & Cooling • 20x25x4 MERV 11',
+    interval: 'Every 90 days',
+    lastDone: 'Nov 15, 2023',
+    nextDue: 'Feb 15, 2024',
+    status: 'Due Soon',
+    icon: 'air',
+  },
+  {
+    id: 'm-2',
+    title: 'Water Heater Flush & Anode Check',
+    system: 'Plumbing • 50 Gal Rheem Tank',
+    interval: 'Annual',
+    lastDone: 'Jun 10, 2023',
+    nextDue: 'Jun 10, 2024',
+    status: 'Optimal',
+    icon: 'water_heater',
+  },
+  {
+    id: 'm-3',
+    title: 'Smoke & CO Detectors Test',
+    system: 'Safety & Security • 6 Devices',
+    interval: 'Monthly',
+    lastDone: 'Dec 01, 2023',
+    nextDue: 'Jan 01, 2024',
+    status: 'Optimal',
+    icon: 'detector_smoke',
+  },
+  {
+    id: 'm-4',
+    title: 'Refrigerator Coil Cleaning',
+    system: 'Kitchen Appliances • French Door',
+    interval: 'Bi-annual',
+    lastDone: 'May 04, 2023',
+    nextDue: 'Nov 04, 2023',
+    status: 'Overdue',
+    icon: 'kitchen',
   },
 ];
 

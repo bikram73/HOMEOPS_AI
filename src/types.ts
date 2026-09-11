@@ -112,6 +112,17 @@ export interface BillItem {
   paidThisMonth?: boolean;
 }
 
+export interface MaintenanceItem {
+  id: string;
+  title: string;
+  system: string;
+  interval: string;
+  lastDone: string;
+  nextDue: string;
+  status: 'Due Soon' | 'Optimal' | 'Overdue';
+  icon: string;
+}
+
 export interface TimelineItem {
   id: string;
   time: string;

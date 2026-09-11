@@ -26,6 +26,7 @@ export const STORAGE_KEYS = {
   INVENTORY: 'homeops_inventory',
   SHOPPING: 'homeops_shopping',
   BILLS: 'homeops_bills',
+  MAINTENANCE: 'homeops_maintenance',
 } as const;
 
 // Restricted key patterns that must NEVER be written to browser storage

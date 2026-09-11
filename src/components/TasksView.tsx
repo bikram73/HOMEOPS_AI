@@ -200,14 +200,32 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     <p className="text-xs text-gray-500">{task.subtitle}</p>
                   </div>
 
-                  {task.aiRecommended && !task.completed && (
-                    <div className="bg-[#CCFBF1]/70 px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0">
-                      <span className="material-symbols-outlined text-[13px] text-[#006f67]">
-                        smart_toy
-                      </span>
-                      <span className="text-[10px] font-bold text-[#006f67]">AI Recommended</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {task.aiRecommended && !task.completed && (
+                      <div className="bg-[#CCFBF1]/70 px-2.5 py-1 rounded-full flex items-center gap-1 shrink-0">
+                        <span className="material-symbols-outlined text-[13px] text-[#006f67]">
+                          smart_toy
+                        </span>
+                        <span className="text-[10px] font-bold text-[#006f67]">AI Recommended</span>
+                      </div>
+                    )}
+                    <button
+                      id={`btn-delete-task-${task.id}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (selectedTask?.id === task.id) {
+                          setSelectedTask(null);
+                        }
+                        onDeleteTask(task.id);
+                      }}
+                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-all opacity-70 hover:opacity-100 group-hover:opacity-100 cursor-pointer"
+                      title={`Delete ${task.title}`}
+                      aria-label={`Delete ${task.title}`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -302,18 +320,34 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </div>
 
           {/* Drawer Actions */}
-          <div className="p-6 border-t border-[#e2e8f0] flex gap-3 bg-gray-50/50">
+          <div className="p-6 border-t border-[#e2e8f0] flex gap-2 bg-gray-50/50">
+            <button
+              id="btn-delete-task-detail"
+              type="button"
+              onClick={() => {
+                const idToDelete = activeTask.id;
+                setSelectedTask(null);
+                onDeleteTask(idToDelete);
+              }}
+              className="py-2.5 px-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm font-semibold hover:bg-red-100 hover:border-red-300 transition-colors shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              title="Delete this task"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+              <span>Delete</span>
+            </button>
             <button
               id="btn-edit-task"
+              type="button"
               onClick={() => alert(`Editing task: ${activeTask.title}`)}
-              className="flex-1 py-2.5 px-4 rounded-lg border border-[#e2e8f0] bg-white text-[#0F172A] text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs"
+              className="flex-1 py-2.5 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#0F172A] text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
             >
               Edit
             </button>
             <button
               id="btn-mark-done-task"
+              type="button"
               onClick={() => onToggleTask(activeTask.id)}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-white text-sm font-semibold transition-colors shadow-xs ${
+              className={`flex-1 py-2.5 px-3 rounded-lg text-white text-sm font-semibold transition-colors shadow-xs cursor-pointer ${
                 activeTask.completed
                   ? 'bg-gray-600 hover:bg-gray-700'
                   : 'bg-[#006a63] hover:bg-[#00504a]'

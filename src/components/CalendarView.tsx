@@ -29,6 +29,7 @@ import {
   Layers,
   ExternalLink,
   Home,
+  Trash2,
 } from 'lucide-react';
 import {
   ActivityEvent,
@@ -58,6 +59,7 @@ interface CalendarViewProps {
   onAskAiAboutDate?: (dateStr: string) => void;
   onAddTask?: (task: Omit<TaskItem, 'id'>) => void;
   onToggleTask?: (id: string) => void;
+  onDeleteTask?: (id: string) => void;
   onAddBill?: (bill: Omit<BillItem, 'id'>) => void;
   onPayBill?: (id: string) => void;
   onAddShoppingItem?: (name: string, category?: string, date?: string) => void;
@@ -128,6 +130,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   onAskAiAboutDate,
   onAddTask,
   onToggleTask,
+  onDeleteTask,
   onAddBill,
   onPayBill,
   onAddShoppingItem,
@@ -1364,17 +1367,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                           </div>
                         </div>
 
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                            task.priority === 'High'
-                              ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : task.priority === 'Medium'
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {task.priority}
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              task.priority === 'High'
+                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                : task.priority === 'Medium'
+                                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {task.priority}
+                          </span>
+                          {onDeleteTask && (
+                            <button
+                              id={`btn-calendar-delete-task-${task.id}`}
+                              type="button"
+                              onClick={() => onDeleteTask(task.id)}
+                              className="p-1 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              title={`Delete ${task.title}`}
+                              aria-label={`Delete ${task.title}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

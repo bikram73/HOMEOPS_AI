@@ -896,6 +896,7 @@ export function App() {
                 setActiveTab={setActiveTab}
                 onAddTask={handleAddTask}
                 onToggleTask={handleToggleTask}
+                onDeleteTask={handleDeleteTask}
                 onAddBill={handleAddBill}
                 onPayBill={handlePayBill}
                 onAddShoppingItem={handleAddShoppingItem}
@@ -1033,6 +1034,7 @@ export function App() {
                   setActiveTab={setActiveTab}
                   onAddTask={handleAddTask}
                   onToggleTask={handleToggleTask}
+                  onDeleteTask={handleDeleteTask}
                   onAddBill={handleAddBill}
                   onPayBill={handlePayBill}
                   onAddShoppingItem={handleAddShoppingItem}

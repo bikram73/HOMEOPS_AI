@@ -9,7 +9,7 @@ import { stateManager } from './state';
  *   ↓
  * Caspian Hosted Gateway (https://api.trycaspianai.com)
  *   ↓
- * HomeOps Backend Agent (Gemini 2.5 Flash + Tool Calling)
+ * HomeOps Backend Agent (Gemini 3.8 Flash + Tool Calling)
  *   ↓
  * Unified In-Memory Household State Manager & Real-Time Response
  */

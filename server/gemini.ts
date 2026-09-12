@@ -861,7 +861,14 @@ export async function processUserMessage(userMessage: string, history: any[] = [
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
     const systemInstruction = `You are HomeOps, an intelligent household operations agent with complete audit logging and an Activity Calendar & Change History system.
 Your responsibility is to help users organize, monitor, execute, and review their everyday household responsibilities and historical activity.
 You have tools to:
@@ -879,7 +886,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - Ground your answer directly in the returned tool data.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.8-flash',
       contents: [
         {
           role: 'user',

@@ -1013,9 +1013,18 @@ class StateManager {
 
   public markBillPaid(idOrName?: string, paid: boolean = true, source: ActivitySource = 'user'): Bill | null {
     if (!idOrName || typeof idOrName !== 'string' || !idOrName.trim()) return null;
-    const target = idOrName.trim().toLowerCase();
+    const target = idOrName.trim().toLowerCase().replace(/\s+bill$/i, '').trim();
     const bill = this.state.bills.find(
-      (b) => b.id.toLowerCase() === target || b.name.toLowerCase().includes(target)
+      (b) => {
+        const bName = b.name.toLowerCase();
+        return b.id.toLowerCase() === target ||
+          bName.includes(target) ||
+          target.includes(bName) ||
+          (target.includes('electricity') && bName.includes('electricity')) ||
+          (target.includes('internet') && bName.includes('internet')) ||
+          (target.includes('water') && bName.includes('water')) ||
+          (target.includes('gas') && bName.includes('gas'));
+      }
     );
     if (!bill) return null;
     const prevPaid = bill.paid;

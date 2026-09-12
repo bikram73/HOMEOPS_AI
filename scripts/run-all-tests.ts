@@ -680,13 +680,17 @@ export async function runAllTests() {
   });
 
   // --- SECTION 14: MAINTENANCE TESTING ---
+  const maintItem = await request('/api/maintenance', {
+    method: 'POST',
+    body: { title: 'Furnace Inspection', category: 'HVAC', dueDate: 'In 2 weeks' }
+  });
   record({
     id: 'MAINT-001',
     name: 'Create Maintenance Task',
     section: 'Maintenance',
     expected: 'Maintenance task created with schedule and category',
-    actual: `Task: ${newMaint.data?.title}`,
-    status: newMaint.status === 201 ? 'PASS' : 'FAIL',
+    actual: `Task: ${maintItem.data?.title}`,
+    status: maintItem.status === 201 ? 'PASS' : 'FAIL',
   });
 
   const maintOverdue = await request('/api/maintenance', { method: 'POST', body: { title: 'Overdue Gutter Cleaning', category: 'Exterior', dueDate: 'Overdue' } });
@@ -709,7 +713,7 @@ export async function runAllTests() {
     status: maintFuture.status === 201 ? 'PASS' : 'FAIL',
   });
 
-  const maintCompleteRes = await request(`/api/maintenance/${newMaint.data.id}`, { method: 'PATCH', body: { status: 'completed' } });
+  const maintCompleteRes = await request(`/api/maintenance/${maintItem.data.id}`, { method: 'PATCH', body: { status: 'completed' } });
   record({
     id: 'MAINT-004',
     name: 'Complete Maintenance Task',

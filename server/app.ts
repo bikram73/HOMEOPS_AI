@@ -26,6 +26,7 @@ export function createExpressApp(): Express {
 
   app.post('/api/reset', (_req: Request, res: Response) => {
     const fresh = stateManager.resetState();
+    caspianService.clearCache();
     res.json({ message: 'State reset to initial seed values', state: fresh });
   });
 

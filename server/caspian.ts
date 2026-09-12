@@ -277,6 +277,10 @@ class CaspianIntegrationService {
     return finalResult;
   }
 
+  public clearCache() {
+    this.processedEvents.clear();
+  }
+
   public getStatus(): CaspianStatus {
     const apiKey = this.getApiKey();
     return {

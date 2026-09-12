@@ -397,7 +397,8 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     msg.includes('changed today') ||
     msg.includes('complete today') ||
     msg.includes('completed today') ||
-    msg.includes('do today') ||
+    msg.includes('what did i do today') ||
+    msg.includes('what i did today') ||
     msg.includes('activity today') ||
     msg.includes('what happened today') ||
     msg.includes('actions today')
@@ -542,9 +543,12 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     msg.includes('what should i do right now') ||
     msg.includes('what should i do now') ||
     msg.includes('what should i do today') ||
+    msg.includes("what's urgent") ||
+    msg.includes('what is urgent') ||
+    msg.includes('what to prioritize') ||
+    msg.includes('what should i prioritize') ||
     msg.includes('what do i need to do') ||
-    msg.includes('what to do now') ||
-    msg.includes('what is urgent')
+    msg.includes('what to do now')
   ) {
     const whatNowResult = tools.whatShouldIDoNow();
     toolsExecuted.push({ toolName: 'whatShouldIDoNow', args: {}, result: whatNowResult });

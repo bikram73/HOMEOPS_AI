@@ -166,6 +166,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [justAddedId, setJustAddedId] = useState<string | null>(null);
 
+  // Filter and View States
+  const [filterMode, setFilterMode] = useState<'all' | 'category' | 'location' | 'status'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedLocation, setSelectedLocation] = useState<string>('All');
+  const [selectedStatus, setSelectedStatus] = useState<string>('All');
+  const [searchFilter, setSearchFilter] = useState<string>('');
+  const [showStaplesShelf, setShowStaplesShelf] = useState<boolean>(true);
+
   // Form states
   const [name, setName] = useState('');
   const [category, setCategory] = useState('Pantry');
@@ -183,6 +191,19 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         (s) => s.name.toLowerCase() === selectedItem.name.toLowerCase() && !s.checked
       )
     : undefined;
+
+  const remainingStaples = PRESET_EXISTING_STAPLES.filter(
+    (preset) => !inventory.some((i) => i.name.toLowerCase() === preset.name.toLowerCase())
+  );
+
+  const handleAddAllRemainingStaples = () => {
+    if (remainingStaples.length === 0) return;
+    remainingStaples.forEach((preset) => {
+      onAddInventoryItem(preset);
+    });
+    setToastMsg(`Added all ${remainingStaples.length} household staples to inventory`);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const handleApplyPreset = (preset: Omit<InventoryItem, 'id'>) => {
     setName(preset.name);
@@ -266,6 +287,59 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     }, 3000);
   };
 
+  // Derive unique locations for location filter
+  const uniqueLocations: string[] = [
+    'All',
+    ...Array.from(
+      new Set<string>(
+        inventory
+          .map((item) => item.location.split('•')[0].trim())
+          .filter(Boolean)
+      )
+    ),
+  ];
+
+  const categoryOptions = ['All', 'Pantry', 'Fridge', 'Cleaning', 'Personal Care', 'General'];
+  const statusOptions = ['All', 'Low (<30%)', 'Adequate (30-70%)', 'High (>70%)', 'Staples'];
+
+  const filteredInventory = inventory.filter((item) => {
+    if (searchFilter.trim()) {
+      const q = searchFilter.toLowerCase();
+      const matchesSearch =
+        item.name.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.location.toLowerCase().includes(q) ||
+        (item.subLocation && item.subLocation.toLowerCase().includes(q));
+      if (!matchesSearch) return false;
+    }
+
+    if (filterMode === 'category') {
+      if (selectedCategory !== 'All' && item.category !== selectedCategory) return false;
+    } else if (filterMode === 'location') {
+      if (
+        selectedLocation !== 'All' &&
+        !item.location.toLowerCase().includes(selectedLocation.toLowerCase())
+      ) {
+        return false;
+      }
+    } else if (filterMode === 'status') {
+      if (selectedStatus === 'Low (<30%)' && item.availability > 30) return false;
+      if (selectedStatus === 'Adequate (30-70%)' && (item.availability <= 30 || item.availability > 70)) return false;
+      if (selectedStatus === 'High (>70%)' && item.availability <= 70) return false;
+      if (selectedStatus === 'Staples' && item.badge !== 'Staple') return false;
+    }
+
+    return true;
+  });
+
+  const resetFilters = () => {
+    setFilterMode('all');
+    setSelectedCategory('All');
+    setSelectedLocation('All');
+    setSelectedStatus('All');
+    setSearchFilter('');
+  };
+
   return (
     <div className="flex-1 p-6 md:p-10 max-w-[1440px] mx-auto w-full overflow-y-auto animate-in fade-in duration-200">
       {/* Toast Alert */}
@@ -277,46 +351,393 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       )}
 
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold text-[#0F172A] tracking-tight">
             Household Inventory
           </h2>
           <p className="text-sm md:text-base text-gray-500 mt-1">
-            Track availability and manage restocks.
+            Track availability, manage par levels, and quick-add household staples.
           </p>
         </div>
-        <button
-          id="btn-add-item-modal"
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center gap-2 bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all self-start md:self-auto shadow-sm active:scale-98"
+        <div className="flex items-center gap-2.5">
+          <button
+            id="btn-toggle-staples-shelf"
+            type="button"
+            onClick={() => setShowStaplesShelf(!showStaplesShelf)}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-lg text-sm font-semibold border transition-all ${
+              showStaplesShelf
+                ? 'bg-teal-50 text-[#0F766E] border-teal-200 hover:bg-teal-100'
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {showStaplesShelf ? 'expand_less' : 'expand_more'}
+            </span>
+            <span>{showStaplesShelf ? 'Hide Staples Shelf' : 'Existing Staples'}</span>
+            {remainingStaples.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs font-bold bg-[#0F766E] text-white">
+                {remainingStaples.length}
+              </span>
+            )}
+          </button>
+          <button
+            id="btn-add-item-modal"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center justify-center gap-2 bg-[#0f172a] hover:bg-[#1e293b] text-white px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shadow-sm active:scale-98"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Add Custom Item
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Add Existing Household Staples Shelf */}
+      {showStaplesShelf && (
+        <div
+          id="quick-add-staples-section"
+          className="bg-white border border-[#e2e8f0] rounded-2xl p-5 mb-8 shadow-xs transition-all duration-200"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          Add Item
-        </button>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-[#0F766E] flex items-center justify-center font-bold">
+                <span className="material-symbols-outlined text-[22px]">inventory</span>
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-[#0F172A]">
+                    Common Household Essentials
+                  </h3>
+                  <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-gray-100 text-gray-700">
+                    {PRESET_EXISTING_STAPLES.length - remainingStaples.length} / {PRESET_EXISTING_STAPLES.length} Added
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Add individual staples directly to your inventory with one click.
+                </p>
+              </div>
+            </div>
+
+            {remainingStaples.length > 0 && (
+              <button
+                id="btn-add-all-remaining-staples"
+                type="button"
+                onClick={handleAddAllRemainingStaples}
+                className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-lg text-xs font-bold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors shadow-2xs"
+              >
+                <span className="material-symbols-outlined text-[16px]">library_add</span>
+                <span>Add All Remaining ({remainingStaples.length})</span>
+              </button>
+            )}
+          </div>
+
+          {/* Existing Staples List / Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {PRESET_EXISTING_STAPLES.map((preset) => {
+              const existingItem = inventory.find(
+                (i) => i.name.toLowerCase() === preset.name.toLowerCase()
+              );
+              const isAdded = !!existingItem;
+
+              return (
+                <div
+                  key={preset.name}
+                  id={`preset-staple-${preset.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  className={`p-3 rounded-xl border flex flex-col justify-between transition-all ${
+                    isAdded
+                      ? 'bg-slate-50/70 border-slate-200'
+                      : 'bg-white border-[#e2e8f0] hover:border-teal-400 hover:shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5 mb-2">
+                    <span className="material-symbols-outlined text-[20px] text-gray-600 p-1.5 rounded-lg bg-gray-100 shrink-0">
+                      {preset.icon}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs font-bold text-[#0F172A] truncate" title={preset.name}>
+                        {preset.name}
+                      </h4>
+                      <p className="text-[11px] text-gray-500 truncate" title={preset.subLocation}>
+                        {preset.unit || preset.subLocation}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-1 mt-2 pt-2 border-t border-gray-100">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">
+                      {preset.category}
+                    </span>
+                    {isAdded ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (existingItem) {
+                            setSelectedId(existingItem.id);
+                            setToastMsg(`Viewing "${existingItem.name}" in inventory`);
+                            setTimeout(() => setToastMsg(null), 2500);
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                        title="Already in inventory (click to view)"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">check</span>
+                        <span>In Stock</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleAddPresetStaple(preset)}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold bg-[#0F766E] text-white hover:bg-[#115E59] transition-colors shadow-2xs cursor-pointer"
+                        title={`Add ${preset.name} to inventory`}
+                      >
+                        <span className="material-symbols-outlined text-[13px]">add</span>
+                        <span>Add</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Filter and View Tabs Interface */}
+      <div
+        id="inventory-filter-bar"
+        className="bg-white border border-[#e2e8f0] rounded-2xl p-4 mb-6 shadow-xs flex flex-col gap-3.5"
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Main Filter Tabs */}
+          <div className="flex items-center gap-1 bg-[#f1f5f9] p-1 rounded-xl w-fit overflow-x-auto max-w-full">
+            <button
+              id="filter-tab-all"
+              type="button"
+              onClick={() => {
+                setFilterMode('all');
+                setSelectedCategory('All');
+                setSelectedLocation('All');
+                setSelectedStatus('All');
+              }}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                filterMode === 'all'
+                  ? 'bg-white text-[#0F172A] shadow-xs'
+                  : 'text-gray-600 hover:text-[#0F172A]'
+              }`}
+            >
+              All Items ({inventory.length})
+            </button>
+            <button
+              id="filter-tab-category"
+              type="button"
+              onClick={() => setFilterMode('category')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterMode === 'category'
+                  ? 'bg-white text-[#0F766E] shadow-xs'
+                  : 'text-gray-600 hover:text-[#0F172A]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">category</span>
+              <span>Category</span>
+            </button>
+            <button
+              id="filter-tab-location"
+              type="button"
+              onClick={() => setFilterMode('location')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterMode === 'location'
+                  ? 'bg-white text-[#0F766E] shadow-xs'
+                  : 'text-gray-600 hover:text-[#0F172A]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">room</span>
+              <span>Location</span>
+            </button>
+            <button
+              id="filter-tab-status"
+              type="button"
+              onClick={() => setFilterMode('status')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                filterMode === 'status'
+                  ? 'bg-white text-[#0F766E] shadow-xs'
+                  : 'text-gray-600 hover:text-[#0F172A]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px]">tune</span>
+              <span>Status</span>
+            </button>
+          </div>
+
+          {/* Quick Search */}
+          <div className="relative w-full md:w-64">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">
+              search
+            </span>
+            <input
+              id="inventory-search-input"
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Search items, tags..."
+              className="w-full bg-[#f8fafc] border border-gray-200 rounded-lg py-1.5 pl-9 pr-7 text-xs text-[#0F172A] placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0F766E] focus:bg-white"
+            />
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={() => setSearchFilter('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sub-Filters based on Active Tab */}
+        {filterMode === 'category' && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-gray-100">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">
+              Category:
+            </span>
+            {categoryOptions.map((cat) => {
+              const count =
+                cat === 'All'
+                  ? inventory.length
+                  : inventory.filter((i) => i.category === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    selectedCategory === cat
+                      ? 'bg-[#0F766E] text-white font-bold shadow-2xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {filterMode === 'location' && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-gray-100">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">
+              Room / Zone:
+            </span>
+            {uniqueLocations.map((loc) => {
+              const count =
+                loc === 'All'
+                  ? inventory.length
+                  : inventory.filter((i) => i.location.toLowerCase().includes(loc.toLowerCase())).length;
+              return (
+                <button
+                  key={loc}
+                  type="button"
+                  onClick={() => setSelectedLocation(loc)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    selectedLocation === loc
+                      ? 'bg-[#0F766E] text-white font-bold shadow-2xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {loc} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {filterMode === 'status' && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-gray-100">
+            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mr-1">
+              Status Level:
+            </span>
+            {statusOptions.map((st) => {
+              const count =
+                st === 'All'
+                  ? inventory.length
+                  : st === 'Low (<30%)'
+                  ? inventory.filter((i) => i.availability <= 30).length
+                  : st === 'Adequate (30-70%)'
+                  ? inventory.filter((i) => i.availability > 30 && i.availability <= 70).length
+                  : st === 'High (>70%)'
+                  ? inventory.filter((i) => i.availability > 70).length
+                  : inventory.filter((i) => i.badge === 'Staple').length;
+              return (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setSelectedStatus(st)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                    selectedStatus === st
+                      ? 'bg-[#0F766E] text-white font-bold shadow-2xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {st} ({count})
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Filter Results Summary Bar if filters active */}
+        {(filterMode !== 'all' || searchFilter || selectedCategory !== 'All' || selectedLocation !== 'All' || selectedStatus !== 'All') && (
+          <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+            <span>
+              Showing <strong className="text-[#0F172A]">{filteredInventory.length}</strong> of {inventory.length} items
+            </span>
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-[#0F766E] hover:underline font-semibold flex items-center gap-1 cursor-pointer"
+            >
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              Reset all filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Inventory Cards Grid (Left 8-9 cols) */}
         <div className="md:col-span-8 lg:col-span-8 xl:col-span-9 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {inventory.length === 0 ? (
+          {filteredInventory.length === 0 ? (
             <div className="col-span-full bg-white border border-[#e2e8f0] rounded-xl p-12 text-center flex flex-col items-center justify-center">
               <span className="material-symbols-outlined text-gray-300 text-5xl mb-3">inventory_2</span>
-              <h3 className="text-lg font-bold text-[#0F172A] mb-1">No Inventory Items</h3>
+              <h3 className="text-lg font-bold text-[#0F172A] mb-1">
+                {inventory.length === 0 ? 'No Inventory Items' : 'No Items Match Filter'}
+              </h3>
               <p className="text-sm text-gray-500 max-w-sm mb-4">
-                Your inventory is currently empty. Add your household staples, groceries, or supplies to track availability.
+                {inventory.length === 0
+                  ? 'Your inventory is currently empty. Add your household staples or supplies to start tracking.'
+                  : 'Try adjusting your category, location, or status filter to see other inventory items.'}
               </p>
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center gap-2 bg-[#0F766E] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#115E59]"
-              >
-                <span className="material-symbols-outlined text-[18px]">add</span>
-                Add First Item
-              </button>
+              {inventory.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center gap-2 bg-[#0F766E] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#115E59]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">refresh</span>
+                  Reset Filters
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowAddModal(true)}
+                  className="inline-flex items-center gap-2 bg-[#0F766E] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#115E59]"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add</span>
+                  Add First Item
+                </button>
+              )}
             </div>
           ) : (
-            inventory.map((item) => {
+            filteredInventory.map((item) => {
               const isSelected = selectedItem?.id === item.id;
               const isLow = item.availability <= 30;
 
@@ -582,6 +1003,28 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
+            {/* Quick Pick Existing Staples in Modal */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1.5">
+                Quick-Pick From Common Essentials:
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1 bg-gray-50 rounded-lg border border-gray-100">
+                {PRESET_EXISTING_STAPLES.map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    onClick={() => handleApplyPreset(preset)}
+                    className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-white border border-gray-200 text-gray-700 hover:border-teal-500 hover:text-[#0F766E] transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px] text-gray-400">
+                      {preset.icon}
+                    </span>
+                    <span>{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <form onSubmit={handleCreateItem} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">

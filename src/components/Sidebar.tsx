@@ -41,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }}
         role="button"
         tabIndex={0}
-        title="Return to Home / Landing Page"
+        title="HomeOps AI Hub"
         className="flex items-center gap-3 px-3 py-2.5 -mx-1 mb-7 cursor-pointer group rounded-xl border border-transparent hover:border-[#334155]/60 hover:bg-white/[0.06] transition-all duration-200 active:scale-[0.98] select-none outline-none focus-visible:ring-2 focus-visible:ring-[#99efe5]/50"
       >
         <img
@@ -55,12 +55,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               HomeOps AI
             </h1>
             <span className="material-symbols-outlined text-xs text-white/40 group-hover:text-[#99efe5] opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-200">
-              arrow_back
+              home
             </span>
           </div>
           <p className="text-xs text-[#99efe5]/90 mt-1 font-medium flex items-center gap-1.5 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#99efe5] shrink-0 animate-pulse"></span>
-            Return to Landing
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>
+            Household Hub
           </p>
         </div>
       </div>

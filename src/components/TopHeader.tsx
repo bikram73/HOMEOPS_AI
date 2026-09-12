@@ -100,7 +100,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       <div
         onClick={() => setActiveTab('landing')}
         className="md:hidden flex items-center gap-2.5 cursor-pointer hover:opacity-85 transition-opacity"
-        title="Return to Home / Landing Page"
+        title="HomeOps AI Hub"
         role="button"
         tabIndex={0}
       >
@@ -133,15 +133,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right Actions */}
       <div className="flex items-center gap-3 md:gap-4">
-        {/* Landing Page Trigger */}
+        {/* Feature Overview Trigger */}
         <button
           id="btn-goto-landing"
           onClick={() => setActiveTab('landing')}
           className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors"
-          title="View Landing Page"
+          title="Product Overview & Features"
         >
-          <span className="material-symbols-outlined text-[16px]">public</span>
-          <span>Website</span>
+          <span className="material-symbols-outlined text-[16px]">explore</span>
+          <span>Overview</span>
         </button>
 
         {/* Notifications Icon Button */}
@@ -436,7 +436,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   }}
                   className="w-full px-3 py-1.5 text-left text-xs font-medium text-gray-700 hover:bg-[#f8fafc] rounded-lg flex items-center gap-2 cursor-pointer transition-colors"
                 >
-                  <span className="material-symbols-outlined text-[16px] text-gray-400">public</span> Landing Page
+                  <span className="material-symbols-outlined text-[16px] text-gray-400">explore</span> Feature Overview
                 </button>
               </div>
             </div>

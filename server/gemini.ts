@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import { tools, ToolResult } from './tools';
 import { stateManager } from './state';
+import { InventoryItem, Bill } from './types';
 
 const toolDeclarations: FunctionDeclaration[] = [
   {
@@ -883,6 +884,8 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - Never guess or invent dates, actions, quantities, or previous states.
 - Always use the activity tools to verify what actually occurred.
 - If a date or entity has no recorded activity, explicitly state: "No changes or actions were recorded on [date]."
+- If the user asks about an inventory item, supply, or product that is not found in the inventory, clearly state that you don't have it (0 in stock, not recorded in your inventory).
+- If the user asks about a bill or task not found in records, clearly state that you don't have it or it is not recorded in household records.
 - Ground your answer directly in the returned tool data.`;
 
     const response = await ai.models.generateContent({
@@ -919,9 +922,80 @@ CRITICAL ANTI-HALLUCINATION RULES:
       }
     }
 
-    // If Gemini called tools but gave minimal text, construct a clean confirmation
+    // If Gemini called tools, pass tool responses back to Gemini for natural synthesis and anti-hallucination
+    if (toolsExecuted.length > 0 && candidates[0]?.content) {
+      try {
+        const functionResponses = toolsExecuted.map((t) => ({
+          functionResponse: {
+            name: t.toolName,
+            response: { result: t.result },
+          },
+        }));
+
+        const secondResponse = await ai.models.generateContent({
+          model: 'gemini-3.8-flash',
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: userMessage }],
+            },
+            candidates[0].content,
+            {
+              role: 'user',
+              parts: functionResponses,
+            },
+          ],
+          config: {
+            systemInstruction,
+            temperature: 0.2,
+          },
+        });
+
+        if (secondResponse.text) {
+          assistantText = secondResponse.text.trim();
+        }
+      } catch (secondErr) {
+        console.warn('[Gemini functionResponse turn error]', secondErr);
+      }
+    }
+
+    // If Gemini called tools but gave minimal text (e.g. 2nd turn skipped or rate limited), construct an accurate confirmation
     if (!assistantText && toolsExecuted.length > 0) {
-      assistantText = toolsExecuted.map((t) => t.result.message).join('\n\n');
+      const listInvExec = toolsExecuted.find((t) => t.toolName === 'listInventory');
+      if (listInvExec && listInvExec.result.data) {
+        const items = listInvExec.result.data as InventoryItem[];
+        const match = userMessage.match(/(?:how many|how much|do i have|count of)\s+([a-zA-Z\s]+?)(?:\s+do i have|\s+left|\s+in inventory|\?|$)/i);
+        const queryItem = match && match[1] ? match[1].replace(/do i have|left|in inventory|\?/gi, '').trim().toLowerCase() : '';
+        if (queryItem) {
+          const found = items.find((i) => i.name.toLowerCase().includes(queryItem));
+          if (found) {
+            assistantText = `You have **${found.name}** at **${found.quantity}%** stock (${found.unit || 'units'}), currently **${found.status.toUpperCase()}** in ${found.location}.`;
+          } else {
+            assistantText = `I don't have "${queryItem}" recorded in your current household inventory (0 in stock).`;
+          }
+        }
+      }
+
+      const listBillsExec = toolsExecuted.find((t) => t.toolName === 'listBills');
+      if (!assistantText && listBillsExec && listBillsExec.result.data) {
+        const bills = listBillsExec.result.data as Bill[];
+        const match = userMessage.match(/(?:did you pay|did i pay|have i paid|is|was)\s+(?:my\s+|the\s+)?([a-zA-Z\s]+?)(?:\s+bill|\s+paid|\?|$)/i);
+        const queriedName = match && match[1] ? match[1].replace(/my|the|bill|paid|\?/gi, '').trim().toLowerCase() : '';
+        if (queriedName) {
+          const foundBill = bills.find((b) => b.name.toLowerCase().includes(queriedName));
+          if (foundBill) {
+            assistantText = foundBill.paid
+              ? `Yes, your **${foundBill.name}** ($${foundBill.amount}) has been marked as **PAID**.`
+              : `No, your **${foundBill.name}** ($${foundBill.amount}) is **UNPAID** and currently due **${foundBill.dueDate}**.`;
+          } else {
+            assistantText = `I don't have any record of a "${queriedName}" bill in your household records (not recorded).`;
+          }
+        }
+      }
+
+      if (!assistantText) {
+        assistantText = toolsExecuted.map((t) => t.result.message).join('\n\n');
+      }
     }
 
     if (!assistantText && toolsExecuted.length === 0) {

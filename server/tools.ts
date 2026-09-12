@@ -87,17 +87,32 @@ export const tools = {
     unit?: string;
     status?: InventoryItem['status'];
     category?: string;
+    currentQuantity?: number;
+    thresholdQuantity?: number;
   }): ToolResult => {
     const item = stateManager.addInventoryItem(
       args.name,
       args.quantity ?? 100,
       args.unit ?? 'units',
       args.status ?? 'good',
-      args.category ?? 'General'
+      args.category ?? 'General',
+      'user',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      args.currentQuantity,
+      args.thresholdQuantity
     );
+    const qtyStr = item.currentQuantity !== undefined ? `${item.currentQuantity} ${item.unit || ''}`.trim() : `${item.quantity}%`;
     return {
       success: true,
-      message: `Added/Updated inventory item: ${item.name} (${item.quantity}% - ${item.status})`,
+      message: `Added ${item.name} to your inventory: ${qtyStr}.`,
       data: item,
       actionType: 'inventory_added',
     };
@@ -107,33 +122,107 @@ export const tools = {
     nameOrId: string;
     quantity?: number;
     status?: InventoryItem['status'];
+    currentQuantity?: number;
+    unit?: string;
+    thresholdQuantity?: number;
   }): ToolResult => {
-    const item = stateManager.updateInventory(args.nameOrId, args.quantity, args.status);
+    const resolved = stateManager.resolveInventoryItem(args.nameOrId);
+    if (resolved.ambiguous.length > 0) {
+      const names = resolved.ambiguous.map((i) => i.name).join(', ');
+      return {
+        success: false,
+        message: `I found multiple matching items: ${names}. Which one would you like to update?`,
+        data: resolved.ambiguous,
+        actionType: 'inventory_ambiguous',
+      };
+    }
+
+    const existing = resolved.match;
+    const prevQty = existing
+      ? (existing.currentQuantity !== undefined ? `${existing.currentQuantity} ${existing.unit || ''}`.trim() : `${existing.quantity}%`)
+      : null;
+
+    const item = stateManager.updateInventory(
+      args.nameOrId,
+      args.quantity,
+      args.status,
+      'user',
+      args.currentQuantity,
+      args.unit,
+      args.thresholdQuantity
+    );
+
     if (!item) {
-      // If item doesn't exist, create it with the given status
+      // If item doesn't exist, register it into inventory
       const created = stateManager.addInventoryItem(
         args.nameOrId,
         args.quantity ?? (args.status === 'critical' ? 15 : args.status === 'low' ? 30 : 80),
-        'unit',
-        args.status ?? 'low'
+        args.unit || 'units',
+        args.status ?? 'good',
+        'General',
+        'user',
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        args.currentQuantity,
+        args.thresholdQuantity
       );
-      if (args.status === 'low' || args.status === 'critical') {
-        stateManager.addShoppingItem(created.name, '1 unit', 'General');
-      }
+      const qtyStr = created.currentQuantity !== undefined ? `${created.currentQuantity} ${created.unit || ''}`.trim() : `${created.quantity}%`;
+      const lowStockMsg = (created.status === 'low' || created.status === 'critical')
+        ? ` ${created.name} is now low in stock and has been added to your shopping list.`
+        : '';
       return {
         success: true,
-        message: `Registered ${created.name} into inventory with status: ${created.status}. Automatically queued to shopping list.`,
+        message: `Added ${created.name} to your inventory: ${qtyStr}.${lowStockMsg}`,
         data: created,
-        actionType: 'inventory_updated',
+        actionType: 'inventory_added',
       };
     }
+
+    const newQty = item.currentQuantity !== undefined ? `${item.currentQuantity} ${item.unit || ''}`.trim() : `${item.quantity}%`;
+    const lowStockMsg = (item.status === 'low' || item.status === 'critical')
+      ? ` ${item.name} is now low in stock and has been added to your shopping list.`
+      : '';
+
     return {
       success: true,
-      message: `Updated inventory: ${item.name} is now at ${item.quantity}% (${item.status}). ${
-        item.status !== 'good' ? 'Added to shopping list for restock.' : ''
-      }`,
+      message: `Updated ${item.name} from ${prevQty || 'previous quantity'} to ${newQty}.${lowStockMsg}`,
       data: item,
       actionType: 'inventory_updated',
+    };
+  },
+
+  checkInventoryItem: (args: { nameOrId: string }): ToolResult => {
+    const resolved = stateManager.resolveInventoryItem(args.nameOrId);
+    if (resolved.ambiguous.length > 0) {
+      const names = resolved.ambiguous.map((i) => i.name).join(', ');
+      return {
+        success: false,
+        message: `I found multiple matching items: ${names}. Which one would you like to check?`,
+        data: resolved.ambiguous,
+        actionType: 'inventory_ambiguous',
+      };
+    }
+    if (!resolved.match) {
+      return {
+        success: false,
+        message: `I don't have ${args.nameOrId} recorded in your current household inventory.`,
+        actionType: 'inventory_not_found',
+      };
+    }
+    const item = resolved.match;
+    const qtyStr = item.currentQuantity !== undefined ? `${item.currentQuantity} ${item.unit || ''}`.trim() : `${item.quantity}%`;
+    return {
+      success: true,
+      message: `${item.name} is currently ${item.status.toUpperCase()}. You have ${qtyStr} remaining.`,
+      data: item,
+      actionType: 'inventory_checked',
     };
   },
 

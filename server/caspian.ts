@@ -141,17 +141,32 @@ class CaspianIntegrationService {
   }
 
   /**
+   * Processed events cache for idempotency protection (PRD Section 8)
+   */
+  private processedEvents = new Map<string, { timestamp: number; result: any }>();
+
+  /**
    * Parse incoming webhook payload from Caspian gateway or Telegram
    */
-  public parseWebhookPayload(body: any): { channel: string; senderId: string; text: string } | null {
+  public parseWebhookPayload(body: any): { channel: string; senderId: string; text: string; eventId: string } | null {
     if (!body) return null;
     
+    // Extract unique event identifier
+    const eventId =
+      body.update_id?.toString() ||
+      body.eventId?.toString() ||
+      body.id?.toString() ||
+      body.message?.message_id?.toString() ||
+      body.messageId?.toString() ||
+      `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
     // Caspian standard format
     if (body.message?.text) {
       return {
         channel: body.channel || 'Telegram',
         senderId: body.message?.from?.id?.toString() || body.senderId || 'user_telegram',
         text: body.message.text,
+        eventId,
       };
     }
     
@@ -161,6 +176,7 @@ class CaspianIntegrationService {
         channel: 'Telegram',
         senderId: body.message.chat.id.toString(),
         text: body.message.text,
+        eventId,
       };
     }
 
@@ -170,6 +186,7 @@ class CaspianIntegrationService {
         channel: body.channel || 'Telegram',
         senderId: body.senderId || 'user_generic',
         text: body.text,
+        eventId,
       };
     }
 
@@ -179,12 +196,31 @@ class CaspianIntegrationService {
   /**
    * Unified message ingestion handler:
    * Accepts messages from Telegram / Caspian and processes via Gemini Agent + Tools.
+   * Enforces PRD Section 8: Idempotency Protection.
    */
   public async handleIncomingMessage(
     channel: string,
     senderId: string,
-    messageText: string
+    messageText: string,
+    eventId?: string
   ) {
+    // Deduplication Key: explicit eventId or payload hash
+    const dedupeKey = eventId || `${channel}:${senderId}:${messageText.trim().toLowerCase()}`;
+
+    // Clean old entries (TTL 10 mins)
+    const now = Date.now();
+    for (const [k, v] of this.processedEvents.entries()) {
+      if (now - v.timestamp > 600000) {
+        this.processedEvents.delete(k);
+      }
+    }
+
+    if (this.processedEvents.has(dedupeKey)) {
+      console.log(`[Idempotency] Duplicate event ${dedupeKey} detected. Skipping mutation execution.`);
+      const cached = this.processedEvents.get(dedupeKey)!.result;
+      return { ...cached, duplicate: true };
+    }
+
     this.totalMessages++;
     this.lastActiveTimestamp = new Date().toLocaleTimeString();
 
@@ -229,10 +265,16 @@ class CaspianIntegrationService {
       }
     }
 
-    return {
+    const finalResult = {
       response: agentResult.response,
       agentToolsExecuted: agentResult.toolsExecuted?.map((t) => t.toolName) || [],
+      eventId: dedupeKey,
     };
+
+    // Cache processed event
+    this.processedEvents.set(dedupeKey, { timestamp: now, result: finalResult });
+
+    return finalResult;
   }
 
   public getStatus(): CaspianStatus {

@@ -22,6 +22,8 @@ export interface InventoryItem {
   name: string;
   category: string;
   quantity: number; // percentage 0-100 or count
+  currentQuantity?: number; // actual physical quantity (e.g. 2, 0.5)
+  thresholdQuantity?: number; // alert threshold (e.g. 1)
   unit?: string;
   status: InventoryStatus;
   location?: string;

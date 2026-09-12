@@ -60,6 +60,13 @@ export async function runAllTests() {
   console.log('HOMEOPS AI — PRD FULL TEST SUITE EXECUTION');
   console.log('================================================================\n');
 
+  // Ensure clean state baseline
+  try {
+    await request('/api/reset', { method: 'POST' });
+  } catch (e) {
+    // server might be booting
+  }
+
   // --- SECTION 5: ENVIRONMENT VARIABLE VERIFICATION ---
   const envExample = fs.readFileSync('.env.example', 'utf-8');
   const hasRequiredVars =
@@ -451,6 +458,14 @@ export async function runAllTests() {
   });
 
   // --- SECTION 11: AUTOMATIC INVENTORY REPLENISHMENT ---
+  // Ensure Colombian Coffee Beans not lingering from prior failed test
+  const existingCoffeeShop = (await request('/api/state')).data.shopping.find((s: any) =>
+    s.name.toLowerCase().includes('colombian coffee')
+  );
+  if (existingCoffeeShop) {
+    await request(`/api/shopping/${existingCoffeeShop.id}`, { method: 'DELETE' });
+  }
+
   const healthyItem = await request('/api/inventory', {
     method: 'POST',
     body: { name: 'Colombian Coffee Beans', quantity: 90, status: 'good' },

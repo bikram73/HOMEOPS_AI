@@ -109,7 +109,9 @@ class StateManager {
           name: 'Jasmine Rice',
           category: 'Pantry',
           quantity: 70,
-          unit: '5kg bag',
+          currentQuantity: 3.5,
+          thresholdQuantity: 1,
+          unit: 'kg',
           status: 'good',
           location: 'Pantry • Shelf 2',
           estimatedRemaining: 'Estimated 3 weeks remaining.',
@@ -591,6 +593,63 @@ class StateManager {
   }
 
   // --- Inventory Methods ---
+  public resolveInventoryItem(query: string): {
+    match: InventoryItem | null;
+    ambiguous: InventoryItem[];
+    notFound: boolean;
+  } {
+    if (!query || !query.trim()) {
+      return { match: null, ambiguous: [], notFound: true };
+    }
+    const q = query.trim().toLowerCase();
+
+    // 1. Direct ID match
+    const byId = this.state.inventory.find((i) => i.id.toLowerCase() === q);
+    if (byId) return { match: byId, ambiguous: [], notFound: false };
+
+    // 2. Exact case-insensitive name match
+    const exact = this.state.inventory.find((i) => i.name.toLowerCase().trim() === q);
+    if (exact) return { match: exact, ambiguous: [], notFound: false };
+
+    // 3. Normalized name match (strip special chars, trim, plurals)
+    const normalize = (s: string) =>
+      s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+    const qNorm = normalize(q);
+    const exactNorm = this.state.inventory.find((i) => normalize(i.name) === qNorm);
+    if (exactNorm) return { match: exactNorm, ambiguous: [], notFound: false };
+
+    const singularQ = qNorm.endsWith('s') ? qNorm.slice(0, -1) : qNorm;
+    const singularMatch = this.state.inventory.find((i) => {
+      const n = normalize(i.name);
+      return n === singularQ || (n.endsWith('s') && n.slice(0, -1) === singularQ);
+    });
+    if (singularMatch) return { match: singularMatch, ambiguous: [], notFound: false };
+
+    // 4. Substring / partial matching
+    const candidates = this.state.inventory.filter((i) => {
+      const name = i.name.toLowerCase();
+      return name.includes(q) || q.includes(name);
+    });
+
+    if (candidates.length === 1) {
+      return { match: candidates[0], ambiguous: [], notFound: false };
+    }
+
+    if (candidates.length > 1) {
+      // Check if one has exact whole-word match
+      const wordMatches = candidates.filter((c) => {
+        const words = c.name.toLowerCase().split(/\s+/);
+        return words.includes(q);
+      });
+      if (wordMatches.length === 1) {
+        return { match: wordMatches[0], ambiguous: [], notFound: false };
+      }
+      return { match: null, ambiguous: candidates, notFound: false };
+    }
+
+    return { match: null, ambiguous: [], notFound: true };
+  }
+
   public addInventoryItem(
     name: string,
     quantity: number = 100,
@@ -606,7 +665,9 @@ class StateManager {
     icon?: string,
     id?: string,
     badge?: string,
-    date?: string
+    date?: string,
+    currentQuantity?: number,
+    thresholdQuantity?: number
   ): InventoryItem {
     const computedStatus: InventoryItem['status'] =
       status || (quantity <= 20 ? 'critical' : quantity <= 35 ? 'low' : 'good');
@@ -615,11 +676,13 @@ class StateManager {
       (i) => (id && i.id === id) || i.name.toLowerCase() === name.toLowerCase()
     );
     if (existing) {
-      const prevQty = existing.quantity;
+      const prevQty = existing.currentQuantity !== undefined ? existing.currentQuantity : existing.quantity;
       const prevStatus = existing.status;
       existing.quantity = quantity;
       existing.status = computedStatus;
       if (unit) existing.unit = unit;
+      if (currentQuantity !== undefined) existing.currentQuantity = currentQuantity;
+      if (thresholdQuantity !== undefined) existing.thresholdQuantity = thresholdQuantity;
       if (category) existing.category = category;
       if (location) existing.location = location;
       if (subLocation) existing.subLocation = subLocation;
@@ -630,19 +693,28 @@ class StateManager {
       if (badge) existing.badge = badge;
       if (date) existing.date = date;
 
+      const qtyDesc = existing.currentQuantity !== undefined ? `${existing.currentQuantity} ${existing.unit || ''}`.trim() : `${quantity}%`;
+      const prevDesc = existing.currentQuantity !== undefined ? `${prevQty} ${existing.unit || ''}`.trim() : `${prevQty}%`;
+
       this.recordActivityEvent({
         type: 'inventory',
-        action: 'inventory_level_updated',
-        title: `Inventory updated: ${existing.name}`,
-        description: `Quantity changed from ${prevQty}% to ${quantity}%`,
+        action: 'inventory_updated',
+        title: 'Inventory Updated',
+        description: `${existing.name}: ${prevDesc} → ${qtyDesc}`,
         source,
         entityType: 'inventory',
         entityId: existing.id,
         entityName: existing.name,
-        before: `${prevQty}% (${prevStatus})`,
-        after: `${quantity}% (${computedStatus})`,
-        diff: { field: 'quantity', before: prevQty, after: quantity, unit: '%' },
+        before: `${prevDesc} (${prevStatus})`,
+        after: `${qtyDesc} (${computedStatus})`,
+        diff: {
+          field: existing.currentQuantity !== undefined ? 'currentQuantity' : 'quantity',
+          before: prevQty,
+          after: existing.currentQuantity !== undefined ? existing.currentQuantity : quantity,
+          unit: existing.unit,
+        },
       });
+
       if (computedStatus === 'low' || computedStatus === 'critical') {
         this.addShoppingItem(existing.name, '1 unit', existing.category, 'automation');
       }
@@ -654,6 +726,8 @@ class StateManager {
       name,
       category: category || 'General',
       quantity,
+      currentQuantity,
+      thresholdQuantity: thresholdQuantity !== undefined ? thresholdQuantity : (currentQuantity !== undefined && currentQuantity > 1 ? Math.round(currentQuantity * 0.5 * 10) / 10 : 1),
       unit: unit || 'units',
       status: computedStatus,
       icon: icon || 'inventory_2',
@@ -666,16 +740,24 @@ class StateManager {
       date: date || new Date().toISOString().split('T')[0],
     };
     this.state.inventory.push(newItem);
+
+    const qtyDesc = newItem.currentQuantity !== undefined ? `${newItem.currentQuantity} ${newItem.unit || ''}`.trim() : `${quantity}%`;
     this.recordActivityEvent({
       type: 'inventory',
       action: 'inventory_added',
-      title: `Inventory added: ${name}`,
-      description: `Starting level: ${quantity}% (${computedStatus})`,
+      title: 'Inventory Added',
+      description: `Added ${name} to inventory: ${qtyDesc}`,
       source,
       entityType: 'inventory',
       entityId: newItem.id,
       entityName: name,
-      after: { quantity, status: computedStatus },
+      after: `${qtyDesc} (${computedStatus})`,
+      diff: {
+        field: newItem.currentQuantity !== undefined ? 'currentQuantity' : 'quantity',
+        before: null,
+        after: newItem.currentQuantity !== undefined ? newItem.currentQuantity : quantity,
+        unit: newItem.unit,
+      },
     });
 
     if (computedStatus === 'low' || computedStatus === 'critical') {
@@ -713,17 +795,42 @@ class StateManager {
     nameOrId: string,
     quantity?: number,
     status?: InventoryItem['status'],
-    source: ActivitySource = 'user'
+    source: ActivitySource = 'user',
+    currentQuantity?: number,
+    unit?: string,
+    thresholdQuantity?: number
   ): InventoryItem | null {
-    const item = this.state.inventory.find(
-      (i) => i.id === nameOrId || i.name.toLowerCase().includes(nameOrId.toLowerCase())
-    );
+    const resolved = this.resolveInventoryItem(nameOrId);
+    const item = resolved.match;
     if (!item) return null;
 
-    const prevQty = item.quantity;
+    const prevCurrentQty = item.currentQuantity !== undefined ? item.currentQuantity : item.quantity;
+    const prevUnit = item.unit || 'units';
     const prevStatus = item.status;
+    const prevPercentage = item.quantity;
 
-    if (quantity !== undefined) {
+    if (currentQuantity !== undefined) {
+      item.currentQuantity = currentQuantity;
+      if (unit) item.unit = unit;
+      if (thresholdQuantity !== undefined) item.thresholdQuantity = thresholdQuantity;
+      const thresh = item.thresholdQuantity !== undefined ? item.thresholdQuantity : 1;
+
+      if (!status) {
+        if (item.currentQuantity <= 0) {
+          item.status = 'critical';
+          item.quantity = 0;
+        } else if (item.currentQuantity <= thresh * 0.4) {
+          item.status = 'critical';
+          item.quantity = 15;
+        } else if (item.currentQuantity <= thresh) {
+          item.status = 'low';
+          item.quantity = 30;
+        } else {
+          item.status = 'good';
+          item.quantity = Math.min(100, Math.round((item.currentQuantity / (thresh * 2)) * 100) || 85);
+        }
+      }
+    } else if (quantity !== undefined) {
       item.quantity = Math.max(0, Math.min(100, quantity));
       if (!status) {
         if (item.quantity <= 20) item.status = 'critical';
@@ -733,22 +840,62 @@ class StateManager {
     }
     if (status) item.status = status;
 
+    const beforeStr = item.currentQuantity !== undefined ? `${prevCurrentQty} ${prevUnit}`.trim() : `${prevPercentage}%`;
+    const afterStr = item.currentQuantity !== undefined ? `${item.currentQuantity} ${item.unit || prevUnit}`.trim() : `${item.quantity}%`;
+
+    // Activity 1: Inventory Updated
     this.recordActivityEvent({
       type: 'inventory',
-      action: 'inventory_level_updated',
-      title: `Inventory updated: ${item.name}`,
-      description: `Level adjusted from ${prevQty}% to ${item.quantity}% (${item.status})`,
+      action: 'inventory_updated',
+      title: 'Inventory Updated',
+      description: `${item.name}: ${beforeStr} → ${afterStr}`,
       source,
       entityType: 'inventory',
       entityId: item.id,
       entityName: item.name,
-      before: `${prevQty}% (${prevStatus})`,
-      after: `${item.quantity}% (${item.status})`,
-      diff: { field: 'quantity', before: prevQty, after: item.quantity, unit: '%' },
+      before: `${beforeStr} (${prevStatus})`,
+      after: `${afterStr} (${item.status})`,
+      diff: {
+        field: item.currentQuantity !== undefined ? 'currentQuantity' : 'quantity',
+        before: prevCurrentQty,
+        after: item.currentQuantity !== undefined ? item.currentQuantity : item.quantity,
+        unit: item.unit || prevUnit,
+      },
     });
 
+    // Check if low/critical stock auto-replenishment applies
     if (item.status === 'low' || item.status === 'critical') {
-      this.addShoppingItem(item.name, '1 unit', item.category, 'automation');
+      // Activity 2: Low Stock Detected
+      this.recordActivityEvent({
+        type: 'automation',
+        action: 'low_stock_detected',
+        title: 'Low Stock Detected',
+        description: `${item.name}: ${afterStr}`,
+        source: 'automation',
+        entityType: 'inventory',
+        entityId: item.id,
+        entityName: item.name,
+        after: `${afterStr} (${item.status.toUpperCase()})`,
+      });
+
+      const existingShop = this.state.shopping.find(
+        (s) => s.name.toLowerCase().trim() === item.name.toLowerCase().trim() && !s.completed
+      );
+      if (!existingShop) {
+        const shopItem = this.addShoppingItem(item.name, '1 unit', item.category, 'automation');
+        // Activity 3: Automatic Shopping Replenishment
+        this.recordActivityEvent({
+          type: 'shopping',
+          action: 'shopping_item_added',
+          title: 'Automatic Shopping Replenishment',
+          description: `Queued ${item.name} to shopping list due to low stock (${afterStr})`,
+          source: 'automation',
+          entityType: 'shopping',
+          entityId: shopItem.id,
+          entityName: item.name,
+          after: shopItem,
+        });
+      }
     }
 
     return item;

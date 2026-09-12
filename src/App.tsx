@@ -172,6 +172,7 @@ export function App() {
               const matched = localById.get(si.id) || localByName.get(si.name.toLowerCase().trim());
               if (!matched) {
                 const avail = typeof si.quantity === 'number' ? si.quantity : (si.status === 'critical' ? 10 : si.status === 'low' ? 25 : 80);
+                const isLow = si.status === 'low' || si.status === 'critical' || avail <= 30;
                 merged.push({
                   id: si.id,
                   name: si.name,
@@ -179,21 +180,32 @@ export function App() {
                   location: si.location || 'Pantry / Storage',
                   subLocation: si.subLocation || 'Standard Pack',
                   availability: avail,
-                  badge: (si.badge as any) || (avail <= 30 ? 'Low' : 'Normal'),
+                  quantity: avail,
+                  currentQuantity: si.currentQuantity,
+                  thresholdQuantity: si.thresholdQuantity,
+                  status: si.status,
+                  badge: (si.badge as any) || (isLow ? 'Low' : 'Normal'),
                   icon: si.icon || (si.category?.toLowerCase().includes('clean') ? 'cleaning_services' : 'inventory_2'),
                   unit: si.unit || 'units',
-                  currentLevelDetail: `${avail}% ${avail <= 30 ? '(Low)' : '(Adequate)'}`,
-                  estimatedRemaining: si.estimatedRemaining || (avail <= 30 ? 'Low stock - restock soon' : 'Estimated 2-3 weeks remaining'),
+                  currentLevelDetail: si.currentQuantity !== undefined ? `${si.currentQuantity} ${si.unit || ''} (${avail}%)` : `${avail}% ${isLow ? '(Low)' : '(Adequate)'}`,
+                  estimatedRemaining: si.estimatedRemaining || (isLow ? 'Low stock - restock soon' : 'Estimated 2-3 weeks remaining'),
                   lastRestocked: si.lastRestocked || 'Recent',
                   avgUsage: si.avgUsage || 'Regular weekly use',
                   date: (si as any).date || getLocalDateString(),
                 });
               } else {
-                if (typeof si.quantity === 'number' && si.quantity !== matched.availability) {
-                  matched.availability = si.quantity;
-                  matched.currentLevelDetail = `${si.quantity}% ${si.quantity <= 30 ? '(Low)' : '(Adequate)'}`;
-                  matched.badge = si.quantity <= 30 ? 'Low' : matched.badge === 'Staple' ? 'Staple' : 'Normal';
-                }
+                const avail = typeof si.quantity === 'number' ? si.quantity : (si.status === 'critical' ? 10 : si.status === 'low' ? 25 : matched.availability);
+                const isLow = si.status === 'low' || si.status === 'critical' || avail <= 30;
+                matched.availability = avail;
+                matched.quantity = avail;
+                if (si.currentQuantity !== undefined) matched.currentQuantity = si.currentQuantity;
+                if (si.thresholdQuantity !== undefined) matched.thresholdQuantity = si.thresholdQuantity;
+                if (si.unit) matched.unit = si.unit;
+                if (si.status) matched.status = si.status;
+                matched.badge = isLow ? 'Low' : matched.badge === 'Staple' ? 'Staple' : 'Normal';
+                matched.currentLevelDetail = matched.currentQuantity !== undefined
+                  ? `${matched.currentQuantity} ${matched.unit || ''} (${avail}%)`
+                  : `${avail}% ${isLow ? '(Low)' : '(Adequate)'}`;
               }
             }
 

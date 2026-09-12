@@ -237,13 +237,15 @@ export function createExpressApp(): Express {
       const result = await caspianService.handleIncomingMessage(
         parsed.channel,
         parsed.senderId,
-        parsed.text
+        parsed.text,
+        parsed.eventId
       );
 
       res.status(200).json({
         ok: true,
         response: result.response,
         tools: result.agentToolsExecuted,
+        eventId: result.eventId,
       });
     } catch (err: any) {
       console.error('[Caspian Webhook Error]', err);
@@ -252,13 +254,14 @@ export function createExpressApp(): Express {
   });
 
   app.post('/api/caspian/simulate', async (req: Request, res: Response) => {
-    const { text, channel, senderId } = req.body;
+    const { text, channel, senderId, eventId } = req.body;
     if (!text) return res.status(400).json({ error: 'Text message is required' });
 
     const result = await caspianService.handleIncomingMessage(
       channel || 'Telegram',
       senderId || 'telegram_user_101',
-      text
+      text,
+      eventId
     );
     res.json({
       ...result,

@@ -2,11 +2,12 @@ import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import { tools, ToolResult } from './tools';
 import { stateManager } from './state';
 import { InventoryItem, Bill } from './types';
+import { classifyIntent, parseQuantityAndUnit } from './intent-router';
 
 const toolDeclarations: FunctionDeclaration[] = [
   {
     name: 'createTask',
-    description: 'Creates a new household chore or task in the in-memory state.',
+    description: 'Creates a new household chore or task in the in-memory state. ONLY call when user explicitly asks to create a task, chore, or to-do.',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -51,13 +52,27 @@ const toolDeclarations: FunctionDeclaration[] = [
     },
   },
   {
-    name: 'updateInventory',
-    description: 'Updates the stock level or status of an inventory item. If low/critical, it auto-queues to shopping list.',
+    name: 'checkInventoryItem',
+    description: 'Checks current stock quantity, units, and status of an inventory item without mutating state. Use for "Is X low?", "How much X do I have?", etc.',
     parameters: {
       type: Type.OBJECT,
       properties: {
-        nameOrId: { type: Type.STRING, description: 'Name of the item (e.g. "detergent", "rice", "toothpaste", "milk")' },
+        nameOrId: { type: Type.STRING, description: 'Name or ID of the inventory item (e.g. "Rice", "Detergent")' },
+      },
+      required: ['nameOrId'],
+    },
+  },
+  {
+    name: 'updateInventory',
+    description: 'Updates the stock level, physical quantity, or status of an inventory item. If low/critical, it auto-queues to shopping list.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        nameOrId: { type: Type.STRING, description: 'Name of the item (e.g. "Rice", "Detergent", "Toothpaste", "Milk")' },
         quantity: { type: Type.NUMBER, description: 'Remaining quantity percentage (0 to 100)' },
+        currentQuantity: { type: Type.NUMBER, description: 'Physical quantity number (e.g. 0.5, 2, 5)' },
+        unit: { type: Type.STRING, description: 'Unit of measure (e.g. "kg", "grams", "liters", "units")' },
+        thresholdQuantity: { type: Type.NUMBER, description: 'Low stock threshold amount (e.g. 1)' },
         status: {
           type: Type.STRING,
           enum: ['good', 'low', 'critical'],
@@ -65,6 +80,22 @@ const toolDeclarations: FunctionDeclaration[] = [
         },
       },
       required: ['nameOrId'],
+    },
+  },
+  {
+    name: 'addInventoryItem',
+    description: 'Adds a new item to household inventory with initial quantity and unit.',
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: 'Name of the inventory item' },
+        quantity: { type: Type.NUMBER, description: 'Percentage quantity (0 to 100)' },
+        currentQuantity: { type: Type.NUMBER, description: 'Physical quantity number (e.g. 2, 5)' },
+        unit: { type: Type.STRING, description: 'Unit of measure (e.g. "kg", "liters", "units")' },
+        thresholdQuantity: { type: Type.NUMBER, description: 'Low stock threshold amount' },
+        category: { type: Type.STRING, description: 'Category (e.g. Pantry, Cleaning, Fridge)' },
+      },
+      required: ['name'],
     },
   },
   {
@@ -285,6 +316,80 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
   const toolsExecuted: { toolName: string; args: any; result: ToolResult }[] = [];
 
   stateManager.incrementMessageCount();
+
+  const state = stateManager.getState();
+  const intentResult = classifyIntent(userMessage, state);
+
+  // 0. Primary Strict Intent Dispatch (PRD Section 3 & 4)
+  if (intentResult.intent === 'UNKNOWN') {
+    return {
+      response: intentResult.clarificationMessage || "I'm not sure whether you want to update inventory, create a task, or check an existing record. Could you clarify?",
+      toolsExecuted: [],
+    };
+  }
+
+  if (intentResult.intent === 'INVENTORY_STATUS_QUERY' || intentResult.intent === 'INVENTORY_QUERY') {
+    if (intentResult.entity) {
+      const toolRes = tools.checkInventoryItem({ nameOrId: intentResult.entity });
+      toolsExecuted.push({ toolName: 'checkInventoryItem', args: { nameOrId: intentResult.entity }, result: toolRes });
+      return { response: toolRes.message, toolsExecuted };
+    }
+    const toolRes = tools.getLowStockItems();
+    toolsExecuted.push({ toolName: 'getLowStockItems', args: {}, result: toolRes });
+    const low = (toolRes.data || []) as InventoryItem[];
+    return {
+      response: low.length === 0
+        ? 'All household inventory items are currently well-stocked.'
+        : `Here are your low-stock items:\n${low.map((i) => `• ${i.name} - ${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`} (${i.status.toUpperCase()})`).join('\n')}`,
+      toolsExecuted,
+    };
+  }
+
+  if (intentResult.intent === 'INVENTORY_UPDATE') {
+    const entityName = intentResult.entity || 'Rice';
+    const toolRes = tools.updateInventory({
+      nameOrId: entityName,
+      currentQuantity: intentResult.quantity,
+      unit: intentResult.unit,
+      thresholdQuantity: intentResult.thresholdQuantity,
+      status: intentResult.status,
+    });
+    toolsExecuted.push({
+      toolName: 'updateInventory',
+      args: {
+        nameOrId: entityName,
+        currentQuantity: intentResult.quantity,
+        unit: intentResult.unit,
+        thresholdQuantity: intentResult.thresholdQuantity,
+        status: intentResult.status,
+      },
+      result: toolRes,
+    });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'INVENTORY_ADD') {
+    const entityName = intentResult.entity || 'Item';
+    const toolRes = tools.addInventoryItem({
+      name: entityName,
+      currentQuantity: intentResult.quantity,
+      unit: intentResult.unit || 'units',
+      thresholdQuantity: intentResult.thresholdQuantity,
+      status: intentResult.status || 'good',
+    });
+    toolsExecuted.push({
+      toolName: 'addInventoryItem',
+      args: {
+        name: entityName,
+        currentQuantity: intentResult.quantity,
+        unit: intentResult.unit,
+        thresholdQuantity: intentResult.thresholdQuantity,
+        status: intentResult.status,
+      },
+      result: toolRes,
+    });
+    return { response: toolRes.message, toolsExecuted };
+  }
 
   // 0a. Historical Activity: "What did I change today?", "What did I do today?", "Changes today", "What changed today?"
   if (
@@ -842,18 +947,115 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     }
   }
 
-  // 10. Default contextual action
-  const createdTask = tools.createTask({ title: userMessage, category: 'general', priority: 'medium' });
-  toolsExecuted.push({ toolName: 'createTask', args: { title: userMessage }, result: createdTask });
+  // 10. Task creation ONLY if intent is explicitly TASK_CREATE (PRD Section 4)
+  if (intentResult.intent === 'TASK_CREATE') {
+    const taskTitle = intentResult.entity || userMessage.replace(/^(?:create\s+(?:a\s+)?task(?:\s+to|\s+for)?|add\s+(?:a\s+)?task(?:\s+to|\s+for)?|remind\s+me\s+to|put\s+on\s+my\s+to-?do\s+list(?:\s+to)?|todo:?)\s+/i, '').trim();
+    const createdTask = tools.createTask({ title: taskTitle, category: 'general', priority: 'medium' });
+    toolsExecuted.push({ toolName: 'createTask', args: { title: taskTitle }, result: createdTask });
 
+    return {
+      response: `Created task: "${createdTask.data?.title || taskTitle}".`,
+      toolsExecuted,
+    };
+  }
+
+  // 11. Clarification fallback - NEVER create a task for unclear intents (BUG-003)
   return {
-    response: `Understood. I've noted this as a household task: "${userMessage}". Let me know if you'd like to assign a specific deadline, priority, or category to it.`,
-    toolsExecuted,
+    response: intentResult.clarificationMessage || "I'm not sure whether you want to update inventory, create a task, or check an existing record. Could you clarify?",
+    toolsExecuted: [],
   };
 }
 
 // Master agent processing function using server-side Gemini SDK if key is configured, or high-fidelity fallback
 export async function processUserMessage(userMessage: string, history: any[] = []): Promise<AgentProcessResult> {
+  const state = stateManager.getState();
+  const intentResult = classifyIntent(userMessage, state);
+
+  // 1. Strict Intent Guardrails (Section 3 & 4 of PRD)
+  // If intent is UNKNOWN, never create a task or mutate state. Ask for clarification directly.
+  if (intentResult.intent === 'UNKNOWN') {
+    stateManager.incrementMessageCount();
+    return {
+      response: intentResult.clarificationMessage || "I'm not sure whether you want to update inventory, create a task, or check an existing record. Could you clarify?",
+      toolsExecuted: [],
+    };
+  }
+
+  // 2. Deterministic handling for Inventory queries (Read-only, zero mutations)
+  if (intentResult.intent === 'INVENTORY_STATUS_QUERY' || intentResult.intent === 'INVENTORY_QUERY') {
+    stateManager.incrementMessageCount();
+    if (intentResult.entity) {
+      const toolRes = tools.checkInventoryItem({ nameOrId: intentResult.entity });
+      return {
+        response: toolRes.message,
+        toolsExecuted: [{ toolName: 'checkInventoryItem', args: { nameOrId: intentResult.entity }, result: toolRes }],
+      };
+    } else {
+      const toolRes = tools.getLowStockItems();
+      const low = (toolRes.data || []) as InventoryItem[];
+      return {
+        response: low.length === 0
+          ? 'All household inventory items are currently well-stocked.'
+          : `Here are your low-stock items:\n${low.map((i) => `• ${i.name} - ${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`} (${i.status.toUpperCase()})`).join('\n')}`,
+        toolsExecuted: [{ toolName: 'getLowStockItems', args: {}, result: toolRes }],
+      };
+    }
+  }
+
+  // 3. Deterministic handling for Inventory updates
+  if (intentResult.intent === 'INVENTORY_UPDATE') {
+    stateManager.incrementMessageCount();
+    const entityName = intentResult.entity || 'Rice';
+    const toolRes = tools.updateInventory({
+      nameOrId: entityName,
+      currentQuantity: intentResult.quantity,
+      unit: intentResult.unit,
+      thresholdQuantity: intentResult.thresholdQuantity,
+      status: intentResult.status,
+    });
+    return {
+      response: toolRes.message,
+      toolsExecuted: [{
+        toolName: 'updateInventory',
+        args: {
+          nameOrId: entityName,
+          currentQuantity: intentResult.quantity,
+          unit: intentResult.unit,
+          thresholdQuantity: intentResult.thresholdQuantity,
+          status: intentResult.status,
+        },
+        result: toolRes,
+      }],
+    };
+  }
+
+  // 4. Deterministic handling for Inventory additions
+  if (intentResult.intent === 'INVENTORY_ADD') {
+    stateManager.incrementMessageCount();
+    const entityName = intentResult.entity || 'Item';
+    const toolRes = tools.addInventoryItem({
+      name: entityName,
+      currentQuantity: intentResult.quantity,
+      unit: intentResult.unit || 'units',
+      thresholdQuantity: intentResult.thresholdQuantity,
+      status: intentResult.status || 'good',
+    });
+    return {
+      response: toolRes.message,
+      toolsExecuted: [{
+        toolName: 'addInventoryItem',
+        args: {
+          name: entityName,
+          currentQuantity: intentResult.quantity,
+          unit: intentResult.unit,
+          thresholdQuantity: intentResult.thresholdQuantity,
+          status: intentResult.status,
+        },
+        result: toolRes,
+      }],
+    };
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
@@ -870,26 +1072,18 @@ export async function processUserMessage(userMessage: string, history: any[] = [
         },
       },
     });
-    const systemInstruction = `You are HomeOps, an intelligent household operations agent with complete audit logging and an Activity Calendar & Change History system.
-Your responsibility is to help users organize, monitor, execute, and review their everyday household responsibilities and historical activity.
-You have tools to:
-1. Create, update, complete, and prioritize tasks, inventory, shopping items, bills, and maintenance schedules.
-2. Query historical activity records:
-   - "getActivityForDate(date)": ALWAYS call when user asks "What did I change today?", "What did I complete yesterday?", "What happened on [date]?", or any date-specific audit question.
-   - "getChangeHistoryForEntity(entityName)": ALWAYS call when user asks "When did I update [item]?", "Which day did I pay [bill]?", "When was [maintenance] completed?", etc.
-   - "getRecentChanges(limit, category)": Retrieve latest activity events.
-   - "getUpcomingSchedule(daysAhead)": Retrieve upcoming bills, maintenance cycles, and due tasks.
-
-CRITICAL ANTI-HALLUCINATION RULES:
-- Never guess or invent dates, actions, quantities, or previous states.
-- Always use the activity tools to verify what actually occurred.
-- If a date or entity has no recorded activity, explicitly state: "No changes or actions were recorded on [date]."
-- If the user asks about an inventory item, supply, or product that is not found in the inventory, clearly state that you don't have it (0 in stock, not recorded in your inventory).
-- If the user asks about a bill or task not found in records, clearly state that you don't have it or it is not recorded in household records.
-- Ground your answer directly in the returned tool data.`;
+    const systemInstruction = `You are HomeOps AI, an intelligent household operations agent with complete audit logging and an Activity Calendar & Change History system.
+Never interpret an inventory update, status question, information query, or general household question as a task creation request.
+Only call createTask when the user explicitly asks to create, add, schedule, remember, remind, or place something on a task/to-do list.
+Questions such as "How much X do I have?" and "Is X low in stock?" are read-only state queries. Answer them using current household state or read-only tools (checkInventoryItem, listInventory). Do not mutate state.
+Commands such as "Set X quantity to Y" and "Update X stock to Y" are inventory updates and must use updateInventory.
+If no supported intent can be determined, do not mutate state. Ask for clarification: "I'm not sure whether you want to update inventory, create a task, or check an existing record. Could you clarify?"
+Never create a task as a fallback.
+Never claim a state change succeeded unless the corresponding tool actually executed successfully.
+Always confirm using actual returned state values.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-3.6-flash',
       contents: [
         {
           role: 'user',
@@ -913,6 +1107,13 @@ CRITICAL ANTI-HALLUCINATION RULES:
         if (part.functionCall) {
           const fnName = part.functionCall.name;
           const fnArgs = part.functionCall.args || {};
+
+          // Safety Interceptor (PRD Section 3 & 4): Prevent illegal task creation for non-task intents
+          if (fnName === 'createTask' && intentResult.intent !== 'TASK_CREATE') {
+            console.warn('[Safety Intercept] Prevented illegal createTask call for non-task intent:', intentResult.intent);
+            continue;
+          }
+
           const result = executeToolByName(fnName, fnArgs);
           toolsExecuted.push({ toolName: fnName, args: fnArgs, result });
         }
@@ -933,7 +1134,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
         }));
 
         const secondResponse = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.6-flash',
           contents: [
             {
               role: 'user',

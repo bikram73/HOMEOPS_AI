@@ -87,6 +87,10 @@ export interface InventoryItem {
   location: string;
   subLocation?: string;
   availability: number; // percentage 0-100
+  quantity?: number;
+  currentQuantity?: number;
+  thresholdQuantity?: number;
+  status?: InventoryStatus;
   badge?: 'Staple' | 'Low' | 'Normal';
   icon: string;
   unit?: string;

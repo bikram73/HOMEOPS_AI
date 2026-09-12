@@ -574,7 +574,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
               </span>
             </div>
             <p className="text-[14px] text-[#45464d]">
-              © 2024 HomeOps AI. The Operating System for Modern Living.
+              © 2026 HomeOps AI. The Operating System for Modern Living.
             </p>
           </div>
           <div className="flex flex-wrap gap-6 md:justify-end items-center">

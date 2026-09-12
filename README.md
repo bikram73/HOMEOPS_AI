@@ -533,8 +533,3 @@ The application is engineered for responsive, low-latency household interactions
 
 This project is licensed under the **MIT License** — see the full license text in the [LICENSE](./LICENSE) file.
 
-<div align="center">
-
-**Built with ❤️ for AI Studio Build & the Caspian SDK Ecosystem**
-
-</div>

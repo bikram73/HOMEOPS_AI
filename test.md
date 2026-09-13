@@ -292,6 +292,35 @@ A comprehensive automated test suite was executed against the **HomeOps AI** pla
 | `GOLDEN-006`| Anti-Hallucination Golden Journey | Non-existent records queried across all domains yield truth | **PASS** |
 | `GOLDEN-007`| Server Restart Golden Journey | Full reset maintains seed data integrity and API health | **PASS** |
 
+### 3.25 Natural Language Household Operations Command Matrix (`NL-OPS`)
+| Command Domain | Example User Utterance | Routed Intent | Executed Tool & Outcome | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| **🏠 Inventory** | *"Add rice to my inventory with 2 kg."* | `INVENTORY_ADD` | `addInventoryItem` (2 kg, initial stock) | **PASS** |
+| **🏠 Inventory** | *"Set rice quantity to 500 grams."* | `INVENTORY_UPDATE` | `updateInventory` (500 grams, status recalculation) | **PASS** |
+| **🏠 Inventory** | *"How much rice do I have?"* | `INVENTORY_STATUS_QUERY` | `checkInventoryItem` (Truthful stock query) | **PASS** |
+| **🏠 Inventory** | *"Which items are running low?"* | `INVENTORY_STATUS_QUERY` | `getLowStockItems` (Items < threshold) | **PASS** |
+| **🏠 Inventory** | *"What household items are out of stock?"* | `INVENTORY_OUT_OF_STOCK_QUERY` | `getOutOfStockItems` (Depleted stock list) | **PASS** |
+| **🏠 Inventory** | *"Remove 1 kg of rice from my inventory."* | `INVENTORY_REDUCE` | `reduceInventoryItem` (Stock decrement & auto-replenish) | **PASS** |
+| **🛒 Shopping** | *"Show my shopping list."* | `SHOPPING_QUERY` | `listShoppingItems` (Full categorized list) | **PASS** |
+| **🛒 Shopping** | *"Add milk to my shopping list."* | `SHOPPING_ADD` | `addShoppingItem` (Milk, 1 unit) | **PASS** |
+| **🛒 Shopping** | *"Add 2 kg rice and 1 litre oil to my shopping list."* | `SHOPPING_ADD` | `addShoppingItem` (Multi-item batch addition) | **PASS** |
+| **🛒 Shopping** | *"What should I buy urgently?"* | `SHOPPING_URGENT_QUERY` | `getRestockRecommendations` (Critical depletion items) | **PASS** |
+| **🛒 Shopping** | *"What items should I restock based on my inventory?"* | `INVENTORY_RESTOCK_QUERY` | `getRestockRecommendations` (Threshold violations) | **PASS** |
+| **✅ Tasks** | *"Add a task to clean the kitchen tomorrow."* | `TASK_CREATE` | `createTask` (Title, due date, category) | **PASS** |
+| **✅ Tasks** | *"Remind me to pay the electricity bill."* | `TASK_CREATE` | `createTask` (Payment reminder task) | **PASS** |
+| **✅ Tasks** | *"Show my pending tasks."* | `TASK_QUERY` | `listTasks` (filter: pending) | **PASS** |
+| **✅ Tasks** | *"What tasks are due today?"* | `TASK_QUERY` | `listTasks` (filter: today) | **PASS** |
+| **✅ Tasks** | *"Mark the kitchen cleaning task as completed."* | `TASK_COMPLETE` | `completeTask` (kitchen cleaning -> completed) | **PASS** |
+| **✅ Tasks** | *"What’s the most urgent task right now?"* | `PRIORITY_QUERY` | `whatShouldIDoNow` (Urgency evaluation) | **PASS** |
+| **💰 Bills** | *"Add my electricity bill of ₹1,850 due on September 20."* | `BILL_ADD` | `addBill` (Electricity, ₹1850, Sep 20) | **PASS** |
+| **💰 Bills** | *"Show my upcoming bills."* | `BILL_QUERY` | `listBills` (filter: upcoming) | **PASS** |
+| **💰 Bills** | *"Which bills are due this week?"* | `BILL_QUERY` | `listBills` (filter: this_week) | **PASS** |
+| **💰 Bills** | *"What bills are overdue?"* | `BILL_QUERY` | `listBills` (filter: overdue) | **PASS** |
+| **💰 Bills** | *"Mark the electricity bill as paid."* | `BILL_PAY` | `markBillPaid` (electricity -> paid) | **PASS** |
+| **🔧 Maintenance** | *"Add AC servicing for next Saturday."* | `MAINTENANCE_ADD` | `addMaintenanceTask` (HVAC service scheduled) | **PASS** |
+| **🔧 Maintenance** | *"Show upcoming maintenance."* | `MAINTENANCE_QUERY` | `listMaintenanceTasks` (filter: upcoming) | **PASS** |
+| **🔧 Maintenance** | *"Mark AC servicing as done."* | `MAINTENANCE_COMPLETE` | `completeMaintenanceTask` (AC service -> completed) | **PASS** |
+
 ---
 
 ## 4. How to Reproduce Tests

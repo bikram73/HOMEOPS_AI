@@ -52,7 +52,7 @@ export interface Bill {
   dueDate: string;
   paid: boolean;
   isAutoPay?: boolean;
-  dueCategory?: 'Due Tomorrow' | 'Due Soon' | 'Paid' | 'Upcoming';
+  dueCategory?: 'Due Tomorrow' | 'Due Soon' | 'Paid' | 'Upcoming' | 'Overdue';
   icon?: string;
 }
 

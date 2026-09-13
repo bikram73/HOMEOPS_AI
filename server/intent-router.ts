@@ -8,11 +8,15 @@ export type UserIntent =
   | 'TASK_QUERY'
   | 'INVENTORY_ADD'
   | 'INVENTORY_UPDATE'
+  | 'INVENTORY_REDUCE'
   | 'INVENTORY_QUERY'
   | 'INVENTORY_STATUS_QUERY'
+  | 'INVENTORY_OUT_OF_STOCK_QUERY'
+  | 'INVENTORY_RESTOCK_QUERY'
   | 'SHOPPING_ADD'
   | 'SHOPPING_REMOVE'
   | 'SHOPPING_QUERY'
+  | 'SHOPPING_URGENT_QUERY'
   | 'BILL_ADD'
   | 'BILL_PAY'
   | 'BILL_QUERY'
@@ -135,19 +139,55 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
   const lower = clean.toLowerCase();
 
   // -------------------------------------------------------------
-  // 1. INVENTORY UPDATE (Highest Priority for quantity alterations)
+  // 1. INVENTORY REDUCE / REMOVAL ("Remove 1 kg of rice from my inventory", "We used 1 kg of rice")
+  // -------------------------------------------------------------
+  const removeInvMatch = lower.match(
+    /(?:remove|deduct|subtract|use|consumed?|drank|ate)\s+([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+|quarter\s+[a-zA-Z]+)\s+(?:of\s+)?([a-zA-Z\s]+?)(?:\s+from\s+(?:my\s+)?inventory)?$/i
+  );
+  if (removeInvMatch && !/task|bill|shopping/i.test(lower)) {
+    const qtyParsed = parseQuantityAndUnit(removeInvMatch[1]);
+    const rawEntity = removeInvMatch[2].replace(/^(the|my|our)\s+/i, '').trim();
+    if (qtyParsed && rawEntity) {
+      return {
+        intent: 'INVENTORY_REDUCE',
+        confidence: 0.98,
+        entity: rawEntity,
+        quantity: qtyParsed.quantity,
+        unit: qtyParsed.unit,
+      };
+    }
+  }
+
+  const removeInvMatch2 = lower.match(
+    /(?:remove|deduct|subtract)\s+([a-zA-Z\s]+?)\s+(?:by|with)\s+([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+)(?:\s+from\s+(?:my\s+)?inventory)?/i
+  );
+  if (removeInvMatch2 && !/task|bill|shopping/i.test(lower)) {
+    const rawEntity = removeInvMatch2[1].replace(/^(the|my|our)\s+/i, '').trim();
+    const qtyParsed = parseQuantityAndUnit(removeInvMatch2[2]);
+    if (qtyParsed && rawEntity) {
+      return {
+        intent: 'INVENTORY_REDUCE',
+        confidence: 0.98,
+        entity: rawEntity,
+        quantity: qtyParsed.quantity,
+        unit: qtyParsed.unit,
+      };
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 2. INVENTORY UPDATE (Highest Priority for quantity alterations)
   // -------------------------------------------------------------
   // Matches:
   // "Set Rice quantity to 0.5 kg."
+  // "Set rice quantity to 500 grams."
   // "Update rice stock to 500 grams."
   // "Change Rice quantity to 1 kg"
   // "I have only 500 grams of rice left"
   // "I only have half a kilo of rice left"
   // "Only 0.5 kg of rice remaining"
-  // "Reduce rice to 1 kg"
-  // "We used some rice. There is 0.5 kg remaining"
   const setQtyMatch = lower.match(
-    /(?:set|update|change|adjust)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:quantity|stock|level|amount)\s+(?:to|at)\s+([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+|quarter\s+[a-zA-Z]+)/i
+    /(?:set|update|change|adjust)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:quantity|stock|level|amount)\s+(?:to|at|as)\s+([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+|quarter\s+[a-zA-Z]+)/i
   );
   if (setQtyMatch) {
     const rawEntity = setQtyMatch[1].replace(/^(the|my|our)\s+/i, '').trim();
@@ -197,32 +237,46 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
     }
   }
 
-  // "We used some rice... there is 0.5 kg remaining"
-  if (/(?:used|consumed|finished|drank|ate)\s+(?:some\s+)?([a-zA-Z\s]+?)[,.]/i.test(lower)) {
-    const entitySub = lower.match(/(?:used|consumed|finished|drank|ate)\s+(?:some\s+)?([a-zA-Z\s]+?)[,.]/i);
-    const qtySub = lower.match(/([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+)\s+(?:left|remaining)/i);
-    if (entitySub && qtySub) {
-      const qtyParsed = parseQuantityAndUnit(qtySub[1]);
-      return {
-        intent: 'INVENTORY_UPDATE',
-        confidence: 0.92,
-        entity: entitySub[1].trim(),
-        quantity: qtyParsed?.quantity,
-        unit: qtyParsed?.unit,
-      };
-    }
+  // -------------------------------------------------------------
+  // 3. INVENTORY STATUS QUERY & SPECIAL QUERIES (Read-Only Safety)
+  // -------------------------------------------------------------
+  // "What household items are out of stock?" / "What items are out of stock?"
+  if (
+    /(?:what|which)\s+(?:household\s+)?(?:items|things|supplies)?\s+(?:are\s+)?(?:out\s+of\s+stock|depleted|empty)/i.test(lower)
+  ) {
+    return {
+      intent: 'INVENTORY_OUT_OF_STOCK_QUERY',
+      confidence: 0.98,
+    };
   }
 
-  // -------------------------------------------------------------
-  // 2. INVENTORY STATUS QUERY (Read-Only Safety)
-  // -------------------------------------------------------------
+  // "What items should I restock based on my inventory?" / "Which items should I restock?" / "What should I restock?"
+  if (
+    /(?:what|which)\s+items\s+should\s+i\s+restock/i.test(lower) ||
+    /restock\s+based\s+on\s+(?:my\s+)?inventory/i.test(lower) ||
+    /(?:what|which)\s+to\s+restock/i.test(lower)
+  ) {
+    return {
+      intent: 'INVENTORY_RESTOCK_QUERY',
+      confidence: 0.98,
+    };
+  }
+
+  // "Which items are running low?" / "What items are low in stock?"
+  if (
+    /(?:which|what)\s+(?:household\s+)?items\s+are\s+(?:running\s+)?low/i.test(lower) ||
+    /low\s+stock\s+items/i.test(lower) ||
+    /^running\s+low$/i.test(lower)
+  ) {
+    return {
+      intent: 'INVENTORY_QUERY',
+      confidence: 0.98,
+    };
+  }
+
   // "Is rice low in stock?"
-  // "Is Jasmine Rice low?"
   // "How much rice do I have?"
   // "How many eggs do I have?"
-  // "What is the stock of rice?"
-  // "Do we have milk?"
-  // "Check rice inventory"
   const isLowMatch = lower.match(
     /^is\s+(?:the\s+)?([a-zA-Z\s]+?)\s+(?:running\s+)?(?:low|critical|out\s+of\s+stock|in\s+stock)(?:\s+in\s+stock)?\??$/i
   );
@@ -260,11 +314,10 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
   }
 
   // -------------------------------------------------------------
-  // 3. INVENTORY ADD
+  // 4. INVENTORY ADD
   // -------------------------------------------------------------
-  // "Add Rice to inventory with 2 kg."
-  // "Add 2 kg Rice to inventory"
-  // "Add milk to inventory: 1 Gallon"
+  // "Add rice to my inventory with 2 kg."
+  // "Add 2 kg rice to my inventory"
   const addInvMatch = lower.match(
     /(?:add|register|insert)\s+([a-zA-Z\s]+?)\s+to\s+(?:my\s+)?inventory(?:\s+with\s+|\s*:\s*|\s+at\s+)?([0-9.]+\s*[a-zA-Z%]*|half\s+a\s+[a-zA-Z]+)?/i
   );
@@ -281,7 +334,6 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
     };
   }
 
-  // "Add 2 kg of Rice to inventory"
   const addInvMatch2 = lower.match(
     /(?:add|register)\s+([0-9.]+\s*[a-zA-Z%]*)\s+(?:of\s+)?([a-zA-Z\s]+?)\s+to\s+(?:my\s+)?inventory/i
   );
@@ -299,12 +351,11 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
   }
 
   // -------------------------------------------------------------
-  // 4. GENERAL INVENTORY QUERY (Read-Only)
+  // 5. GENERAL INVENTORY QUERY (Read-Only)
   // -------------------------------------------------------------
   if (
     /^(?:show|list|get|view|display|check)\s+(?:my\s+)?inventory/i.test(lower) ||
-    /^(?:what\s+is\s+in\s+(?:my\s+)?inventory|what\s+inventory\s+do\s+(?:i|we)\s+have)/i.test(lower) ||
-    /^(?:low\s+stock\s+items|which\s+items\s+are\s+low)/i.test(lower)
+    /^(?:what\s+is\s+in\s+(?:my\s+)?inventory|what\s+inventory\s+do\s+(?:i|we)\s+have)/i.test(lower)
   ) {
     return {
       intent: 'INVENTORY_QUERY',
@@ -313,80 +364,28 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
   }
 
   // -------------------------------------------------------------
-  // 5. EXPLICIT TASK INTENT (Rule TS-001 & BUG-003)
-  // Explicit task verbs required: "create a task", "add a task",
-  // "remind me to", "put this on my to-do list", "schedule a task"
-  // -------------------------------------------------------------
-  const explicitTaskMatch = lower.match(
-    /^(?:create\s+(?:a\s+)?task|add\s+(?:a\s+)?task|remind\s+me\s+to|put\s+(?:this\s+)?on\s+(?:my\s+)?(?:to-do|todo)\s+list|schedule\s+(?:a\s+)?task|new\s+task\s*:?)\s*(.*)/i
-  );
-  if (explicitTaskMatch) {
-    const taskDetails = explicitTaskMatch[1]?.trim() || clean;
-    // Extract date if present, e.g. "tomorrow", "next Monday"
-    let targetDate: string | undefined;
-    if (/tomorrow/i.test(taskDetails)) targetDate = 'Tomorrow';
-    else if (/today/i.test(taskDetails)) targetDate = 'Today';
-    else if (/in\s+(\d+)\s+days?/i.test(taskDetails)) {
-      const d = taskDetails.match(/in\s+(\d+)\s+days?/i);
-      if (d) targetDate = `In ${d[1]} days`;
-    }
-
-    return {
-      intent: 'TASK_CREATE',
-      confidence: 0.98,
-      details: { title: taskDetails },
-      targetDate,
-    };
-  }
-
-  // Task complete
-  if (
-    /^(?:mark|set)\s+(?:the\s+)?task\s+(.+?)\s+(?:as\s+)?(?:completed|done|finished)/i.test(lower) ||
-    /^(?:complete|finish)\s+(?:the\s+)?task\s+(.+)/i.test(lower) ||
-    /^(?:mark\s+)?clean\s+kitchen\s+(?:as\s+)?(?:completed|done)/i.test(lower)
-  ) {
-    const m = lower.match(/(?:task\s+|mark\s+)(.+?)(?:\s+as\s+completed|\s+as\s+done|\s+complete|\s+done|$)/i);
-    return {
-      intent: 'TASK_COMPLETE',
-      confidence: 0.95,
-      entity: m ? m[1].trim() : 'task',
-    };
-  }
-
-  // Task delete
-  if (/^(?:delete|remove)\s+(?:the\s+)?task\s+(.+)/i.test(lower)) {
-    const m = lower.match(/(?:delete|remove)\s+(?:the\s+)?task\s+(.+)/i);
-    return {
-      intent: 'TASK_DELETE',
-      confidence: 0.95,
-      entity: m ? m[1].trim() : 'task',
-    };
-  }
-
-  // Task query (Read-Only)
-  if (
-    /^(?:what\s+tasks|show\s+(?:my\s+)?tasks|list\s+tasks|what\s+chores|pending\s+tasks)/i.test(lower) ||
-    lower === 'tasks' ||
-    lower === 'show tasks'
-  ) {
-    return {
-      intent: 'TASK_QUERY',
-      confidence: 0.95,
-    };
-  }
-
-  // -------------------------------------------------------------
   // 6. SHOPPING LIST INTENTS
   // -------------------------------------------------------------
+  // "What should I buy urgently?"
+  if (/what\s+should\s+i\s+buy\s+urgently/i.test(lower) || /urgent\s+(?:shopping|groceries|items\s+to\s+buy)/i.test(lower)) {
+    return {
+      intent: 'SHOPPING_URGENT_QUERY',
+      confidence: 0.98,
+    };
+  }
+
+  // "Add milk to my shopping list." / "Add 2 kg rice and 1 litre oil to my shopping list."
   if (
     /^(?:add\s+(.+?)\s+to\s+(?:my\s+)?shopping\s+list|need\s+to\s+buy\s+(.+)|buy\s+(.+?)\s+for\s+shopping)/i.test(lower) &&
     !/task/i.test(lower)
   ) {
     const m = lower.match(/(?:add\s+(.+?)\s+to\s+(?:my\s+)?shopping|need\s+to\s+buy\s+(.+))/i);
+    const itemStr = (m ? (m[1] || m[2]) : '').trim();
     return {
       intent: 'SHOPPING_ADD',
-      confidence: 0.94,
-      entity: m ? (m[1] || m[2]).trim() : 'item',
+      confidence: 0.96,
+      entity: itemStr || 'item',
+      details: { rawItems: itemStr },
     };
   }
 
@@ -414,36 +413,94 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
   // -------------------------------------------------------------
   // 7. BILLS INTENTS
   // -------------------------------------------------------------
-  if (/^(?:mark|set)\s+(.+?)\s+(?:bill\s+)?(?:as\s+)?paid/i.test(lower) || /^paid\s+(?:my\s+)?(.+?)\s+bill/i.test(lower)) {
-    const m = lower.match(/(?:mark|set|paid)\s+(?:my\s+)?(.+?)(?:\s+bill)?\s+(?:as\s+)?paid/i) ||
-      lower.match(/^paid\s+(?:my\s+)?(.+?)\s+bill/i);
+  // "Add my electricity bill of ₹1,850 due on September 20."
+  // "Add electricity bill $120 due tomorrow"
+  const addBillMatch = lower.match(
+    /(?:add|register|record)\s+(?:my\s+)?([a-zA-Z\s]+?)\s+bill(?:\s+of|\s*:)?\s*(?:[₹$€£Rs\.\s]*)([0-9,]+(?:\.[0-9]{2})?)\s*(?:due\s+(?:on\s+)?([a-zA-Z0-9\s]+))?/i
+  );
+  if (addBillMatch) {
+    const billName = `${addBillMatch[1].trim()} Bill`;
+    const cleanAmt = parseFloat(addBillMatch[2].replace(/,/g, ''));
+    const dueStr = addBillMatch[3] ? addBillMatch[3].trim() : 'Due Soon';
     return {
-      intent: 'BILL_PAY',
-      confidence: 0.96,
-      entity: m ? m[1].trim() : 'bill',
+      intent: 'BILL_ADD',
+      confidence: 0.98,
+      entity: billName,
+      quantity: isNaN(cleanAmt) ? 0 : cleanAmt,
+      targetDate: dueStr,
     };
   }
 
+  // "Mark the electricity bill as paid." / "Paid electricity bill"
   if (
-    /^(?:did\s+i\s+pay|have\s+i\s+paid|is\s+(?:the\s+)?([a-zA-Z\s]+?)\s+bill\s+paid|what\s+bills|show\s+(?:my\s+)?bills|upcoming\s+bills)/i.test(lower)
+    /^(?:mark\s+(?:the\s+)?([a-zA-Z\s]+?)\s+bill\s+as\s+paid|mark\s+bill\s+([a-zA-Z\s]+?)\s+as\s+paid|paid\s+(?:my\s+|the\s+)?([a-zA-Z\s]+?)\s+bill)/i.test(lower) ||
+    /^(?:mark\s+(.+?)\s+as\s+paid)/i.test(lower)
   ) {
-    const m = lower.match(/(?:did\s+i\s+pay|have\s+i\s+paid|is)\s+(?:the\s+)?([a-zA-Z\s]+?)\s+bill/i);
+    const m = lower.match(/(?:mark\s+(?:the\s+)?|paid\s+(?:my\s+|the\s+)?)(.+?)(?:\s+bill)?(?:\s+as\s+paid|$)/i);
+    return {
+      intent: 'BILL_PAY',
+      confidence: 0.98,
+      entity: m ? m[1].replace(/bill|paid|the|my/gi, '').trim() : 'bill',
+    };
+  }
+
+  // "Which bills are due this week?" / "What bills are overdue?" / "Show my upcoming bills."
+  if (
+    /^(?:show\s+(?:my\s+)?(?:upcoming\s+)?bills|which\s+bills\s+are\s+due|what\s+bills\s+are\s+overdue|what\s+bills|upcoming\s+bills|overdue\s+bills)/i.test(lower)
+  ) {
+    let filter = 'upcoming';
+    if (/overdue/i.test(lower)) filter = 'overdue';
+    else if (/this\s+week/i.test(lower)) filter = 'this_week';
     return {
       intent: 'BILL_QUERY',
-      confidence: 0.95,
-      entity: m ? m[1].trim() : undefined,
+      confidence: 0.98,
+      details: { filter },
     };
   }
 
   // -------------------------------------------------------------
   // 8. MAINTENANCE INTENTS
   // -------------------------------------------------------------
-  if (/^(?:schedule|add)\s+maintenance\s+(.+)/i.test(lower)) {
-    const m = lower.match(/(?:schedule|add)\s+maintenance\s+(.+)/i);
+  // "Add AC servicing for next Saturday."
+  // "Remind me to service the washing machine."
+  // "Schedule maintenance: water filter"
+  const addMaintMatch = lower.match(
+    /(?:add|schedule)\s+(?:an?\s+)?([a-zA-Z\s]+?)(?:\s+servicing|\s+service|\s+maintenance)(?:\s+for\s+([a-zA-Z0-9\s]+))?/i
+  );
+  if (addMaintMatch) {
+    const title = `${addMaintMatch[1].trim()} Servicing`;
+    const due = addMaintMatch[2] ? addMaintMatch[2].trim() : 'Upcoming';
+    let cat = 'Appliance';
+    if (/ac|air\s*con/i.test(title)) cat = 'HVAC';
+    else if (/tap|sink|plumb|water/i.test(title)) cat = 'Plumbing';
     return {
       intent: 'MAINTENANCE_ADD',
-      confidence: 0.95,
-      details: { title: m ? m[1].trim() : 'Maintenance' },
+      confidence: 0.98,
+      details: { title, category: cat, dueDate: due },
+    };
+  }
+
+  if (/^remind\s+me\s+to\s+service\s+(?:the\s+)?([a-zA-Z\s]+)/i.test(lower)) {
+    const m = lower.match(/^remind\s+me\s+to\s+service\s+(?:the\s+)?([a-zA-Z\s]+)/i);
+    const title = `Service the ${m ? m[1].trim() : 'Appliance'}`;
+    return {
+      intent: 'MAINTENANCE_ADD',
+      confidence: 0.96,
+      details: { title, category: 'Appliance', dueDate: 'This Weekend' },
+    };
+  }
+
+  // "When is my next maintenance task?" / "Show all upcoming maintenance." / "What home maintenance is overdue?"
+  if (
+    /^(?:when\s+is\s+my\s+next\s+maintenance|show\s+all\s+upcoming\s+maintenance|what\s+home\s+maintenance\s+is\s+overdue|what\s+maintenance|upcoming\s+maintenance)/i.test(lower)
+  ) {
+    let filter = 'upcoming';
+    if (/overdue/i.test(lower)) filter = 'overdue';
+    else if (/next/i.test(lower)) filter = 'next';
+    return {
+      intent: 'MAINTENANCE_QUERY',
+      confidence: 0.98,
+      details: { filter },
     };
   }
 
@@ -456,22 +513,115 @@ export function classifyIntent(message: string, state?: HomeState): IntentClassi
     };
   }
 
-  if (/^(?:what\s+maintenance|upcoming\s+maintenance|maintenance\s+schedule)/i.test(lower)) {
-    return {
-      intent: 'MAINTENANCE_QUERY',
-      confidence: 0.95,
-    };
-  }
-
   // -------------------------------------------------------------
-  // 9. PRIORITY & PLANNING QUERIES
+  // 9. EXPLICIT TASK INTENT (Rule TS-001 & BUG-003)
+  // "Add a task to clean the kitchen tomorrow."
+  // "Remind me to pay the electricity bill."
+  // "Show my pending tasks."
+  // "What tasks are due today?"
+  // "Mark the kitchen cleaning task as completed."
+  // "What's the most urgent task right now?"
   // -------------------------------------------------------------
+  // "What's the most urgent task right now?" / "What is the most urgent task?"
   if (
-    /^(?:what\s+should\s+i\s+do\s+now|what\s+to\s+do\s+now|prioritize\s+(?:my\s+)?tasks|daily\s+briefing|morning\s+briefing|weekly\s+plan)/i.test(lower)
+    /(?:what(?:'s|\s+is)\s+the\s+most\s+urgent\s+task|most\s+urgent\s+task|top\s+priority\s+task)/i.test(lower)
   ) {
     return {
       intent: 'PRIORITY_QUERY',
       confidence: 0.98,
+    };
+  }
+
+  // "What tasks are due today?"
+  if (
+    /what\s+tasks\s+are\s+due\s+today/i.test(lower) ||
+    /tasks\s+due\s+today/i.test(lower) ||
+    /today(?:'s)?\s+tasks/i.test(lower)
+  ) {
+    return {
+      intent: 'TASK_QUERY',
+      confidence: 0.98,
+      details: { filter: 'today' },
+    };
+  }
+
+  // "Show my pending tasks."
+  if (
+    /show\s+(?:my\s+)?pending\s+tasks/i.test(lower) ||
+    /pending\s+tasks/i.test(lower) ||
+    /what\s+are\s+my\s+pending\s+tasks/i.test(lower)
+  ) {
+    return {
+      intent: 'TASK_QUERY',
+      confidence: 0.98,
+      details: { filter: 'pending' },
+    };
+  }
+
+  // "Add a task to clean the kitchen tomorrow."
+  // "Remind me to pay the electricity bill."
+  const explicitTaskMatch = lower.match(
+    /^(?:add\s+(?:a\s+)?task\s+(?:to\s+)?|create\s+(?:a\s+)?task\s+(?:to\s+)?|remind\s+me\s+to\s+|put\s+(?:this\s+)?on\s+(?:my\s+)?(?:to-do|todo)\s+list|schedule\s+(?:a\s+)?task)\s*(.*)/i
+  );
+  if (explicitTaskMatch) {
+    let taskTitle = explicitTaskMatch[1]?.trim() || clean;
+    let targetDate = 'Today';
+    let cat: any = 'general';
+
+    if (/tomorrow/i.test(taskTitle)) {
+      targetDate = 'Tomorrow';
+      taskTitle = taskTitle.replace(/\s+tomorrow/i, '').trim();
+    } else if (/today/i.test(taskTitle)) {
+      targetDate = 'Today';
+      taskTitle = taskTitle.replace(/\s+today/i, '').trim();
+    }
+
+    if (/kitchen|clean|sweep|vacuum|disinfect/i.test(taskTitle)) cat = 'cleaning';
+    else if (/bill|pay|electricity|utility/i.test(taskTitle)) cat = 'bill';
+    else if (/service|ac|plumb|maintenance/i.test(taskTitle)) cat = 'maintenance';
+    else if (/buy|shop|grocery/i.test(taskTitle)) cat = 'shopping';
+
+    return {
+      intent: 'TASK_CREATE',
+      confidence: 0.98,
+      details: { title: taskTitle.charAt(0).toUpperCase() + taskTitle.slice(1), category: cat, dueDate: targetDate },
+      targetDate,
+    };
+  }
+
+  // Task complete: "Mark the kitchen cleaning task as completed."
+  if (
+    /^(?:mark|set)\s+(?:the\s+)?([a-zA-Z\s]+?)\s*(?:task)?\s+as\s+(?:completed|done|finished)/i.test(lower) ||
+    /^(?:complete|finish)\s+(?:the\s+)?([a-zA-Z\s]+?)\s*(?:task)?$/i.test(lower)
+  ) {
+    const m = lower.match(/(?:mark|set|complete|finish)\s+(?:the\s+)?([a-zA-Z\s]+?)(?:\s+task)?(?:\s+as\s+completed|\s+as\s+done|\s+done|$)/i);
+    const target = m ? m[1].replace(/task|the|my/gi, '').trim() : 'task';
+    return {
+      intent: 'TASK_COMPLETE',
+      confidence: 0.98,
+      entity: target,
+    };
+  }
+
+  // Task delete
+  if (/^(?:delete|remove)\s+(?:the\s+)?task\s+(.+)/i.test(lower)) {
+    const m = lower.match(/(?:delete|remove)\s+(?:the\s+)?task\s+(.+)/i);
+    return {
+      intent: 'TASK_DELETE',
+      confidence: 0.95,
+      entity: m ? m[1].trim() : 'task',
+    };
+  }
+
+  // Task query (Read-Only)
+  if (
+    /^(?:what\s+tasks|show\s+(?:my\s+)?tasks|list\s+tasks|what\s+chores)/i.test(lower) ||
+    lower === 'tasks' ||
+    lower === 'show tasks'
+  ) {
+    return {
+      intent: 'TASK_QUERY',
+      confidence: 0.95,
     };
   }
 

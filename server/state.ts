@@ -920,6 +920,92 @@ class StateManager {
     return this.state.inventory.length < initialLen;
   }
 
+  public reduceInventory(
+    nameOrId: string,
+    amountToReduce: number,
+    unit?: string,
+    source: ActivitySource = 'user'
+  ): { item: InventoryItem | null; deducted: number; remaining: number; unit: string; previous: number; ambiguous?: InventoryItem[] } {
+    const resolved = this.resolveInventoryItem(nameOrId);
+    if (resolved.ambiguous.length > 0) {
+      return { item: null, deducted: 0, remaining: 0, unit: '', previous: 0, ambiguous: resolved.ambiguous };
+    }
+    const item = resolved.match;
+    if (!item) return { item: null, deducted: 0, remaining: 0, unit: '', previous: 0 };
+
+    let effectiveDeduct = amountToReduce;
+    const itemUnit = (item.unit || '').toLowerCase();
+    const inputUnit = (unit || '').toLowerCase();
+
+    // Unit conversion: e.g. deducting 500 grams from item in kg
+    if ((inputUnit === 'g' || inputUnit === 'grams' || inputUnit === 'gram') && (itemUnit === 'kg' || itemUnit.includes('kg'))) {
+      effectiveDeduct = amountToReduce / 1000;
+    } else if ((inputUnit === 'kg' || inputUnit === 'kgs') && (itemUnit === 'grams' || itemUnit === 'g')) {
+      effectiveDeduct = amountToReduce * 1000;
+    } else if ((inputUnit === 'ml') && (itemUnit === 'liters' || itemUnit === 'l' || itemUnit.includes('liter'))) {
+      effectiveDeduct = amountToReduce / 1000;
+    }
+
+    const prevQty = item.currentQuantity !== undefined ? item.currentQuantity : item.quantity;
+    const prevStatus = item.status;
+    let newQty = Math.max(0, Math.round((prevQty - effectiveDeduct) * 100) / 100);
+
+    if (item.currentQuantity !== undefined) {
+      item.currentQuantity = newQty;
+      const thresh = item.thresholdQuantity !== undefined ? item.thresholdQuantity : 1;
+      if (item.currentQuantity <= 0) {
+        item.status = 'critical';
+        item.quantity = 0;
+      } else if (item.currentQuantity <= thresh) {
+        item.status = 'low';
+        item.quantity = Math.max(10, Math.min(35, Math.round((item.currentQuantity / (thresh * 2)) * 50)));
+      } else {
+        item.status = 'good';
+        item.quantity = Math.min(100, Math.max(40, Math.round((item.currentQuantity / (thresh * 3)) * 100)));
+      }
+    } else {
+      item.quantity = newQty;
+      if (item.quantity <= 15) item.status = 'critical';
+      else if (item.quantity <= 35) item.status = 'low';
+      else item.status = 'good';
+    }
+
+    const prevDesc = item.currentQuantity !== undefined ? `${prevQty} ${item.unit || ''}`.trim() : `${prevQty}%`;
+    const newDesc = item.currentQuantity !== undefined ? `${newQty} ${item.unit || ''}`.trim() : `${newQty}%`;
+    const deductedDesc = `${effectiveDeduct} ${item.unit || unit || ''}`.trim();
+
+    this.recordActivityEvent({
+      type: 'inventory',
+      action: 'inventory_deducted',
+      title: `Inventory used: ${item.name}`,
+      description: `Removed ${deductedDesc} (${prevDesc} → ${newDesc})`,
+      source,
+      entityType: 'inventory',
+      entityId: item.id,
+      entityName: item.name,
+      before: `${prevDesc} (${prevStatus})`,
+      after: `${newDesc} (${item.status})`,
+      diff: {
+        field: item.currentQuantity !== undefined ? 'currentQuantity' : 'quantity',
+        before: prevQty,
+        after: newQty,
+        unit: item.unit,
+      },
+    });
+
+    if (item.status === 'low' || item.status === 'critical') {
+      this.addShoppingItem(item.name, '1 unit', item.category, 'automation');
+    }
+
+    return {
+      item,
+      deducted: effectiveDeduct,
+      remaining: newQty,
+      unit: item.unit || unit || 'units',
+      previous: prevQty,
+    };
+  }
+
   public updateInventory(
     nameOrId: string,
     quantity?: number,

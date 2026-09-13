@@ -35,10 +35,12 @@ export const tools = {
     };
   },
 
-  listTasks: (args?: { filter?: 'pending' | 'completed' | 'all'; category?: string }): ToolResult => {
+  listTasks: (args?: { filter?: 'pending' | 'completed' | 'all' | 'today' | 'urgent'; category?: string }): ToolResult => {
     let tasks = stateManager.getState().tasks;
     if (args?.filter === 'pending') tasks = tasks.filter((t) => !t.completed);
     if (args?.filter === 'completed') tasks = tasks.filter((t) => t.completed);
+    if (args?.filter === 'today') tasks = tasks.filter((t) => !t.completed && (t.dueDate?.toLowerCase().includes('today') || t.dueDate?.toLowerCase().includes('due today')));
+    if (args?.filter === 'urgent') tasks = tasks.filter((t) => !t.completed && (t.priority === 'high' || t.dueDate?.toLowerCase().includes('today')));
     if (args?.category) tasks = tasks.filter((t) => t.category.toLowerCase() === args.category?.toLowerCase());
     return {
       success: true,
@@ -236,6 +238,72 @@ export const tools = {
     };
   },
 
+  reduceInventoryItem: (args: {
+    nameOrId: string;
+    amount: number;
+    unit?: string;
+  }): ToolResult => {
+    const res = stateManager.reduceInventory(args.nameOrId, args.amount, args.unit, 'user');
+    if (res.ambiguous && res.ambiguous.length > 0) {
+      const names = res.ambiguous.map((i) => i.name).join(', ');
+      return {
+        success: false,
+        message: `I found multiple matching items: ${names}. Which one would you like to deduct from?`,
+        data: res.ambiguous,
+        actionType: 'inventory_ambiguous',
+      };
+    }
+    if (!res.item) {
+      return {
+        success: false,
+        message: `Could not find "${args.nameOrId}" in your inventory to reduce.`,
+        actionType: 'inventory_not_found',
+      };
+    }
+
+    const item = res.item;
+    const qtyStr = item.currentQuantity !== undefined ? `${item.currentQuantity} ${item.unit || ''}`.trim() : `${item.quantity}%`;
+    const lowMsg = (item.status === 'low' || item.status === 'critical')
+      ? ` ⚠️ ${item.name} is now ${item.status.toUpperCase()} (${qtyStr}) and was queued to your shopping list.`
+      : '';
+
+    return {
+      success: true,
+      message: `Removed ${res.deducted} ${res.unit} of ${item.name}. Remaining inventory: ${qtyStr}.${lowMsg}`,
+      data: item,
+      actionType: 'inventory_reduced',
+    };
+  },
+
+  getOutOfStockItems: (): ToolResult => {
+    const items = stateManager.getState().inventory.filter(
+      (i) => i.status === 'critical' || i.quantity === 0 || (i.currentQuantity !== undefined && i.currentQuantity <= 0)
+    );
+    return {
+      success: true,
+      message: `Found ${items.length} out-of-stock or critically depleted household items.`,
+      data: items,
+      actionType: 'out_of_stock_retrieved',
+    };
+  },
+
+  getRestockRecommendations: (): ToolResult => {
+    const state = stateManager.getState();
+    const lowItems = state.inventory.filter(
+      (i) => i.status === 'low' || i.status === 'critical' || (i.currentQuantity !== undefined && i.thresholdQuantity !== undefined && i.currentQuantity <= i.thresholdQuantity)
+    );
+    const unboughtShopping = state.shopping.filter((s) => !s.completed);
+    return {
+      success: true,
+      message: `Found ${lowItems.length} inventory items requiring restock and ${unboughtShopping.length} pending shopping items.`,
+      data: {
+        inventoryNeedingRestock: lowItems,
+        pendingShoppingList: unboughtShopping,
+      },
+      actionType: 'restock_recommendations_retrieved',
+    };
+  },
+
   getLowStockItems: (): ToolResult => {
     const items = stateManager.getState().inventory.filter((i) => i.status === 'low' || i.status === 'critical');
     return {
@@ -314,8 +382,17 @@ export const tools = {
     };
   },
 
-  listBills: (): ToolResult => {
-    const bills = stateManager.getState().bills;
+  listBills: (args?: { filter?: 'all' | 'unpaid' | 'paid' | 'overdue' | 'this_week' | 'upcoming' }): ToolResult => {
+    let bills = stateManager.getState().bills;
+    if (args?.filter === 'unpaid' || args?.filter === 'upcoming') {
+      bills = bills.filter((b) => !b.paid);
+    } else if (args?.filter === 'paid') {
+      bills = bills.filter((b) => b.paid);
+    } else if (args?.filter === 'overdue') {
+      bills = bills.filter((b) => !b.paid && (b.dueCategory === 'Overdue' || b.dueDate.toLowerCase().includes('overdue')));
+    } else if (args?.filter === 'this_week') {
+      bills = bills.filter((b) => !b.paid && (b.dueCategory === 'Due Tomorrow' || b.dueDate.toLowerCase().includes('friday') || b.dueDate.toLowerCase().includes('tomorrow') || b.dueDate.toLowerCase().includes('today') || b.dueDate.toLowerCase().includes('this week')));
+    }
     return {
       success: true,
       message: `Found ${bills.length} bills (${bills.filter((b) => !b.paid).length} unpaid)`,
@@ -346,8 +423,17 @@ export const tools = {
     };
   },
 
-  listMaintenanceTasks: (): ToolResult => {
-    const maintenance = stateManager.getState().maintenance;
+  listMaintenanceTasks: (args?: { filter?: 'all' | 'pending' | 'overdue' | 'upcoming' | 'completed' }): ToolResult => {
+    let maintenance = stateManager.getState().maintenance;
+    if (args?.filter === 'pending') {
+      maintenance = maintenance.filter((m) => m.status === 'pending');
+    } else if (args?.filter === 'overdue') {
+      maintenance = maintenance.filter((m) => m.status === 'overdue');
+    } else if (args?.filter === 'completed') {
+      maintenance = maintenance.filter((m) => m.status === 'completed');
+    } else if (args?.filter === 'upcoming') {
+      maintenance = maintenance.filter((m) => m.status !== 'completed');
+    }
     return {
       success: true,
       message: `Found ${maintenance.length} maintenance records`,

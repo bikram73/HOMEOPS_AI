@@ -328,6 +328,261 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
     };
   }
 
+  if (intentResult.intent === 'INVENTORY_REDUCE') {
+    const entityName = intentResult.entity || 'item';
+    const amount = intentResult.quantity || 1;
+    const toolRes = tools.reduceInventoryItem({
+      nameOrId: entityName,
+      amount,
+      unit: intentResult.unit,
+    });
+    toolsExecuted.push({
+      toolName: 'reduceInventoryItem',
+      args: { nameOrId: entityName, amount, unit: intentResult.unit },
+      result: toolRes,
+    });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'INVENTORY_OUT_OF_STOCK_QUERY') {
+    const toolRes = tools.getOutOfStockItems();
+    toolsExecuted.push({ toolName: 'getOutOfStockItems', args: {}, result: toolRes });
+    const items = (toolRes.data || []) as InventoryItem[];
+    if (items.length === 0) {
+      return {
+        response: 'Good news! None of your household inventory items are currently out of stock or depleted.',
+        toolsExecuted,
+      };
+    }
+    const response = `Here are your **out-of-stock or depleted items**:\n${items.map((i) => `• ⚠️ **${i.name}** - ${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`} (${i.status.toUpperCase()})`).join('\n')}\n\nThese items have been queued to your shopping list for replenishment.`;
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'INVENTORY_RESTOCK_QUERY') {
+    const toolRes = tools.getRestockRecommendations();
+    toolsExecuted.push({ toolName: 'getRestockRecommendations', args: {}, result: toolRes });
+    const lowInv = toolRes.data?.inventoryNeedingRestock || [];
+    const pendingShop = toolRes.data?.pendingShoppingList || [];
+    if (lowInv.length === 0 && pendingShop.length === 0) {
+      return {
+        response: 'Your household is fully stocked! There are no inventory items below threshold or pending replenishment.',
+        toolsExecuted,
+      };
+    }
+    let response = `Here are the **items you should restock based on your inventory**:\n\n`;
+    if (lowInv.length > 0) {
+      response += `📦 **Inventory Below Threshold:**\n` + lowInv.map((i: any) => `• **${i.name}** (${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`} remaining, alert at ${i.thresholdQuantity || 20}${i.unit || ''}) [${i.status.toUpperCase()}]`).join('\n') + '\n\n';
+    }
+    if (pendingShop.length > 0) {
+      response += `🛒 **Unpurchased Shopping Items:**\n` + pendingShop.map((s: any) => `• **${s.name}** (${s.quantity || '1 unit'})`).join('\n');
+    }
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'SHOPPING_URGENT_QUERY') {
+    const recRes = tools.getRestockRecommendations();
+    toolsExecuted.push({ toolName: 'getRestockRecommendations', args: {}, result: recRes });
+    const criticalItems = (recRes.data?.inventoryNeedingRestock || []).filter((i: any) => i.status === 'critical' || (i.currentQuantity !== undefined && i.currentQuantity <= 0));
+    const lowItems = (recRes.data?.inventoryNeedingRestock || []).filter((i: any) => i.status === 'low');
+    const pendingShop = recRes.data?.pendingShoppingList || [];
+
+    let response = `Here is what you should **buy urgently**:\n\n`;
+    if (criticalItems.length > 0) {
+      response += `🚨 **Critically Depleted (Immediate Priority):**\n` + criticalItems.map((i: any) => `• **${i.name}** — ${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`} remaining`).join('\n') + '\n\n';
+    }
+    if (lowItems.length > 0) {
+      response += `⚠️ **Running Low:**\n` + lowItems.map((i: any) => `• **${i.name}** (${i.currentQuantity !== undefined ? `${i.currentQuantity} ${i.unit || ''}`.trim() : `${i.quantity}%`})`).join('\n') + '\n\n';
+    }
+    if (pendingShop.length > 0) {
+      response += `🛒 **Current Shopping List:**\n` + pendingShop.map((s: any) => `• ${s.name} (${s.quantity || '1 unit'})`).join('\n');
+    }
+    if (criticalItems.length === 0 && lowItems.length === 0 && pendingShop.length === 0) {
+      response = 'You have no urgent shopping requirements right now. All pantry, fridge, and supply levels are healthy.';
+    }
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'SHOPPING_ADD') {
+    const raw = (intentResult.details?.rawItems || intentResult.entity || '').trim();
+    const itemsToAdd = raw.split(/\s+and\s+|,/i).map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+    const addedList: string[] = [];
+
+    for (const itemText of itemsToAdd) {
+      const match = itemText.match(/^([0-9.]+\s*(?:kg|grams|g|litres|liters|litre|liter|l|ml|bottles|boxes|units)?)\s+(?:of\s+)?(.+)$/i);
+      let name = itemText;
+      let qty = '1 unit';
+      if (match) {
+        qty = match[1].trim();
+        name = match[2].trim();
+      }
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+      const res = tools.addShoppingItem({ name, quantity: qty });
+      toolsExecuted.push({ toolName: 'addShoppingItem', args: { name, quantity: qty }, result: res });
+      addedList.push(`${name} (${qty})`);
+    }
+
+    const response = addedList.length === 1
+      ? `Added **${addedList[0]}** to your shopping list.`
+      : `Added to your shopping list:\n${addedList.map((item) => `✓ **${item}**`).join('\n')}`;
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'SHOPPING_QUERY') {
+    const toolRes = tools.listShoppingItems();
+    toolsExecuted.push({ toolName: 'listShoppingItems', args: {}, result: toolRes });
+    const items = toolRes.data || [];
+    const pending = items.filter((i: any) => !i.completed);
+    const completed = items.filter((i: any) => i.completed);
+
+    if (items.length === 0) {
+      return { response: 'Your shopping list is currently empty. You can add items anytime!', toolsExecuted };
+    }
+    let response = `Here is your **shopping list** (${pending.length} pending, ${completed.length} purchased):\n\n`;
+    if (pending.length > 0) {
+      response += `🛒 **To Buy:**\n` + pending.map((i: any) => `• **${i.name}** (${i.quantity || '1 unit'})`).join('\n') + '\n\n';
+    }
+    if (completed.length > 0) {
+      response += `✓ **Recently Purchased:**\n` + completed.map((i: any) => `• ~${i.name}~`).join('\n');
+    }
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'SHOPPING_REMOVE') {
+    const toolRes = tools.removeShoppingItem({ idOrName: intentResult.entity || '' });
+    toolsExecuted.push({ toolName: 'removeShoppingItem', args: { idOrName: intentResult.entity || '' }, result: toolRes });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'BILL_ADD') {
+    const toolRes = tools.addBill({
+      name: intentResult.entity || 'Utility Bill',
+      amount: intentResult.quantity ?? 0,
+      dueDate: intentResult.targetDate || 'Due Soon',
+    });
+    toolsExecuted.push({
+      toolName: 'addBill',
+      args: { name: intentResult.entity, amount: intentResult.quantity, dueDate: intentResult.targetDate },
+      result: toolRes,
+    });
+    return {
+      response: `Recorded **${toolRes.data.name}** (${toolRes.data.amount ? `₹${toolRes.data.amount}` : 'Amount TBD'}) due **${toolRes.data.dueDate}** in your bills ledger.`,
+      toolsExecuted,
+    };
+  }
+
+  if (intentResult.intent === 'BILL_PAY') {
+    const target = intentResult.entity || 'electricity';
+    const toolRes = tools.markBillPaid({ idOrName: target, paid: true });
+    toolsExecuted.push({ toolName: 'markBillPaid', args: { idOrName: target, paid: true }, result: toolRes });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'BILL_QUERY') {
+    const filter = intentResult.details?.filter || 'upcoming';
+    const toolRes = tools.listBills({ filter });
+    toolsExecuted.push({ toolName: 'listBills', args: { filter }, result: toolRes });
+    const bills = (toolRes.data || []) as any[];
+    if (bills.length === 0) {
+      return { response: `You have no ${filter === 'overdue' ? 'overdue' : filter === 'this_week' ? 'bills due this week' : 'unpaid bills'} at this time!`, toolsExecuted };
+    }
+    const filterTitle = filter === 'overdue' ? 'Overdue Bills' : filter === 'this_week' ? 'Bills Due This Week' : 'Upcoming Bills';
+    let response = `Here are your **${filterTitle}**:\n\n`;
+    bills.forEach((b: any) => {
+      const statusIcon = b.paid ? '✅' : b.dueCategory === 'Overdue' ? '🚨' : '💳';
+      response += `${statusIcon} **${b.name}** — ₹${b.amount} (Due: ${b.dueDate}) [${b.paid ? 'PAID' : b.dueCategory || 'Upcoming'}]\n`;
+    });
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'MAINTENANCE_ADD') {
+    const title = intentResult.details?.title || 'Maintenance Task';
+    const cat = intentResult.details?.category || 'Appliance';
+    const due = intentResult.details?.dueDate || 'Upcoming';
+    const toolRes = tools.addMaintenanceTask({ title, category: cat, dueDate: due });
+    toolsExecuted.push({ toolName: 'addMaintenanceTask', args: { title, category: cat, dueDate: due }, result: toolRes });
+
+    const taskRes = tools.createTask({ title, category: 'maintenance', dueDate: due, priority: 'medium' });
+    toolsExecuted.push({ toolName: 'createTask', args: { title, category: 'maintenance', dueDate: due }, result: taskRes });
+
+    return {
+      response: `Scheduled maintenance: **${title}** (${cat}) due **${due}**. Added to your maintenance schedule and tasks ledger.`,
+      toolsExecuted,
+    };
+  }
+
+  if (intentResult.intent === 'MAINTENANCE_COMPLETE') {
+    const toolRes = tools.completeMaintenanceTask({ idOrTitle: intentResult.entity || '' });
+    toolsExecuted.push({ toolName: 'completeMaintenanceTask', args: { idOrTitle: intentResult.entity || '' }, result: toolRes });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'MAINTENANCE_QUERY') {
+    const filter = intentResult.details?.filter || 'upcoming';
+    const toolRes = tools.listMaintenanceTasks({ filter });
+    toolsExecuted.push({ toolName: 'listMaintenanceTasks', args: { filter }, result: toolRes });
+    const records = (toolRes.data || []) as any[];
+    if (records.length === 0) {
+      return { response: `You have no ${filter === 'overdue' ? 'overdue' : 'pending'} home maintenance tasks at this time.`, toolsExecuted };
+    }
+    let response = `Here is your **maintenance schedule**:\n\n`;
+    records.forEach((m: any) => {
+      const icon = m.status === 'completed' ? '✅' : m.status === 'overdue' ? '🚨' : '🔧';
+      response += `${icon} **${m.title}** (${m.category}) — Due: ${m.dueDate} [${m.status.toUpperCase()}]\n`;
+    });
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'TASK_CREATE') {
+    const title = intentResult.details?.title || 'Task';
+    const cat = intentResult.details?.category || 'general';
+    const dueDate = intentResult.details?.dueDate || intentResult.targetDate || 'Today';
+    const toolRes = tools.createTask({ title, category: cat, dueDate, priority: 'medium' });
+    toolsExecuted.push({ toolName: 'createTask', args: { title, category: cat, dueDate }, result: toolRes });
+    return {
+      response: `Created task: **${title}** (Category: ${cat}, Due: ${dueDate}).`,
+      toolsExecuted,
+    };
+  }
+
+  if (intentResult.intent === 'TASK_COMPLETE') {
+    const toolRes = tools.completeTask({ idOrTitle: intentResult.entity || 'task' });
+    toolsExecuted.push({ toolName: 'completeTask', args: { idOrTitle: intentResult.entity || 'task' }, result: toolRes });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'TASK_DELETE') {
+    const toolRes = tools.deleteTask({ idOrTitle: intentResult.entity || 'task' });
+    toolsExecuted.push({ toolName: 'deleteTask', args: { idOrTitle: intentResult.entity || 'task' }, result: toolRes });
+    return { response: toolRes.message, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'TASK_QUERY') {
+    const filter = intentResult.details?.filter || 'all';
+    const toolRes = tools.listTasks({ filter });
+    toolsExecuted.push({ toolName: 'listTasks', args: { filter }, result: toolRes });
+    const tasks = (toolRes.data || []) as any[];
+    if (tasks.length === 0) {
+      return { response: `No tasks found matching your filter (${filter}).`, toolsExecuted };
+    }
+    const filterLabel = filter === 'today' ? 'Tasks Due Today' : filter === 'pending' ? 'Pending Tasks' : 'Tasks';
+    let response = `Here are your **${filterLabel}**:\n\n`;
+    tasks.forEach((t: any) => {
+      const icon = t.completed ? '✅' : t.priority === 'high' ? '🔴' : '📋';
+      response += `${icon} **${t.title}** (${t.category}, Due: ${t.dueDate || 'No date'}) [${t.completed ? 'COMPLETED' : t.priority.toUpperCase()}]\n`;
+    });
+    return { response, toolsExecuted };
+  }
+
+  if (intentResult.intent === 'PRIORITY_QUERY') {
+    const whatNowResult = tools.whatShouldIDoNow();
+    toolsExecuted.push({ toolName: 'whatShouldIDoNow', args: {}, result: whatNowResult });
+    const prioResult = tools.prioritizeHouseholdTasks();
+    toolsExecuted.push({ toolName: 'prioritizeHouseholdTasks', args: {}, result: prioResult });
+    const d = whatNowResult.data;
+    const response = `Here is your most urgent priority right now:\n\n👉 **Top Action:** ${d.primaryRecommendation}\n⏱️ **Estimated Time:** ${d.estimatedTime}\n💡 **Next Step:** ${d.secondaryAction}`;
+    return { response, toolsExecuted, priorities: prioResult.data, whatNow: d };
+  }
+
   if (intentResult.intent === 'INVENTORY_STATUS_QUERY' || intentResult.intent === 'INVENTORY_QUERY') {
     if (intentResult.entity) {
       const toolRes = tools.checkInventoryItem({ nameOrId: intentResult.entity });
@@ -949,18 +1204,6 @@ function fallbackNlpAgent(userMessage: string): AgentProcessResult {
         toolsExecuted,
       };
     }
-  }
-
-  // 10. Task creation ONLY if intent is explicitly TASK_CREATE (PRD Section 4)
-  if (intentResult.intent === 'TASK_CREATE') {
-    const taskTitle = intentResult.entity || userMessage.replace(/^(?:create\s+(?:a\s+)?task(?:\s+to|\s+for)?|add\s+(?:a\s+)?task(?:\s+to|\s+for)?|remind\s+me\s+to|put\s+on\s+my\s+to-?do\s+list(?:\s+to)?|todo:?)\s+/i, '').trim();
-    const createdTask = tools.createTask({ title: taskTitle, category: 'general', priority: 'medium' });
-    toolsExecuted.push({ toolName: 'createTask', args: { title: taskTitle }, result: createdTask });
-
-    return {
-      response: `Created task: "${createdTask.data?.title || taskTitle}".`,
-      toolsExecuted,
-    };
   }
 
   // 11. Clarification fallback - NEVER create a task for unclear intents (BUG-003)

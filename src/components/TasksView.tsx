@@ -6,6 +6,7 @@ interface TasksViewProps {
   tasks: TaskItem[];
   onToggleTask: (id: string) => void;
   onAddTask: (newTask: Omit<TaskItem, 'id'>) => void;
+  onUpdateTask?: (updatedTask: TaskItem) => void;
   selectedTask: TaskItem | null;
   setSelectedTask: (task: TaskItem | null) => void;
   onDeleteTask: (id: string) => void;
@@ -15,6 +16,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
   tasks,
   onToggleTask,
   onAddTask,
+  onUpdateTask,
   selectedTask,
   setSelectedTask,
   onDeleteTask,
@@ -29,10 +31,83 @@ export const TasksView: React.FC<TasksViewProps> = ({
   const [newCategory, setNewCategory] = useState('Household');
   const [newAmount, setNewAmount] = useState('');
   const [newProvider, setNewProvider] = useState('');
+
+  // Editing Task state
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDueDate, setEditDueDate] = useState(todayStr);
+  const [editDateError, setEditDateError] = useState<string | null>(null);
+  const [editPriority, setEditPriority] = useState<TaskPriority>('High');
+  const [editCategory, setEditCategory] = useState('Household');
+  const [editAmount, setEditAmount] = useState('');
+  const [editProvider, setEditProvider] = useState('');
+
   const [toastMsg, setToastMsg] = useState<string | null>(null);
 
   // Default select first task if none selected
   const activeTask = selectedTask || tasks[0] || null;
+
+  const openEditModal = (task: TaskItem) => {
+    setEditingTask(task);
+    setEditTitle(task.title);
+    const rawDate =
+      task.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate)
+        ? task.dueDate
+        : task.date && /^\d{4}-\d{2}-\d{2}$/.test(task.date)
+        ? task.date
+        : todayStr;
+    setEditDueDate(rawDate);
+    setEditDateError(null);
+    setEditPriority(task.priority || 'Medium');
+    setEditCategory(task.category || 'Household');
+    setEditAmount(task.amount ? task.amount.replace('$', '') : '');
+    setEditProvider(task.provider || '');
+  };
+
+  const handleSaveEditTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTask || !editTitle.trim()) return;
+
+    if (editDueDate < todayStr) {
+      setEditDateError(
+        'Tasks can only be scheduled for today or upcoming days. Previous dates are not allowed.'
+      );
+      return;
+    }
+
+    let displayDueDate = editDueDate;
+    if (editDueDate === todayStr) {
+      displayDueDate = 'Today';
+    } else {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      if (editDueDate === getLocalDateString(tomorrow)) {
+        displayDueDate = 'Tomorrow';
+      }
+    }
+
+    const updated: TaskItem = {
+      ...editingTask,
+      title: editTitle.trim(),
+      subtitle: `${displayDueDate} • ${editCategory}`,
+      priority: editPriority,
+      category: editCategory,
+      dueDate: editDueDate,
+      date: editDueDate,
+      amount: editAmount ? `$${editAmount}` : undefined,
+      provider: editProvider || undefined,
+    };
+
+    if (onUpdateTask) {
+      onUpdateTask(updated);
+    }
+    if (selectedTask?.id === updated.id) {
+      setSelectedTask(updated);
+    }
+    setEditingTask(null);
+    setToastMsg(`Task "${updated.title}" updated successfully.`);
+    setTimeout(() => setToastMsg(null), 3000);
+  };
 
   const filteredTasks = tasks.filter((t) => {
     if (filter === 'Today') return (t.dueDate === todayStr || t.dueDate.toLowerCase().includes('today')) && !t.completed;
@@ -340,12 +415,15 @@ export const TasksView: React.FC<TasksViewProps> = ({
               id="btn-edit-task"
               type="button"
               onClick={() => {
-                setToastMsg(`Editing for "${activeTask.title}" enabled.`);
-                setTimeout(() => setToastMsg(null), 3000);
+                if (activeTask) {
+                  openEditModal(activeTask);
+                }
               }}
-              className="flex-1 py-2.5 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#0F172A] text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer"
+              className="flex-1 py-2.5 px-3 rounded-lg border border-[#e2e8f0] bg-white text-[#0F172A] text-sm font-semibold hover:bg-gray-50 transition-colors shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+              title="Edit this task"
             >
-              Edit
+              <span className="material-symbols-outlined text-[18px]">edit</span>
+              <span>Edit</span>
             </button>
             <button
               id="btn-mark-done-task"
@@ -511,6 +589,196 @@ export const TasksView: React.FC<TasksViewProps> = ({
                   className="flex-1 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-semibold hover:bg-[#115E59]"
                 >
                   Save Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTask && (
+        <div
+          id="modal-edit-task"
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#e2e8f0] space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#0F766E] text-[22px]">edit_note</span>
+                <h3 className="text-lg font-bold text-[#0F172A]">Edit Household Task</h3>
+              </div>
+              <button
+                id="btn-close-edit-modal"
+                type="button"
+                onClick={() => setEditingTask(null)}
+                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                title="Close"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditTask} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Task Title *
+                </label>
+                <input
+                  id="input-edit-task-title"
+                  type="text"
+                  required
+                  placeholder="e.g. Schedule chimney inspection"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                />
+              </div>
+
+              {editDateError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 font-medium">
+                  {editDateError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700">Due Date *</label>
+                    <span className="text-[10px] text-teal-700 font-medium">Today / Future</span>
+                  </div>
+                  <input
+                    id="input-edit-task-due-date"
+                    type="date"
+                    required
+                    min={todayStr}
+                    value={editDueDate}
+                    onChange={(e) => {
+                      setEditDueDate(e.target.value);
+                      if (e.target.value < todayStr) {
+                        setEditDateError(
+                          'Cannot select previous dates. Only today or upcoming days are allowed.'
+                        );
+                      } else {
+                        setEditDateError(null);
+                      }
+                    }}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  />
+                  <div className="flex gap-1 mt-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditDueDate(todayStr);
+                        setEditDateError(null);
+                      }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                        editDueDate === todayStr
+                          ? 'bg-[#0F766E] text-white border-[#0F766E]'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tomorrow = new Date();
+                        tomorrow.setDate(tomorrow.getDate() + 1);
+                        setEditDueDate(getLocalDateString(tomorrow));
+                        setEditDateError(null);
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200"
+                    >
+                      Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = new Date();
+                        next.setDate(next.getDate() + 3);
+                        setEditDueDate(getLocalDateString(next));
+                        setEditDateError(null);
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200"
+                    >
+                      +3 Days
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Priority</label>
+                  <select
+                    id="select-edit-task-priority"
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value as TaskPriority)}
+                    className="w-full border border-gray-300 rounded-lg p-2 text-xs font-medium text-gray-800 focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  >
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Category</label>
+                  <input
+                    id="input-edit-task-category"
+                    type="text"
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    placeholder="Bills, Maintenance, etc."
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Amount (Optional)
+                  </label>
+                  <input
+                    id="input-edit-task-amount"
+                    type="text"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                    placeholder="e.g. 120.00"
+                    className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Provider / Assignee (Optional)
+                </label>
+                <input
+                  id="input-edit-task-provider"
+                  type="text"
+                  value={editProvider}
+                  onChange={(e) => setEditProvider(e.target.value)}
+                  placeholder="e.g. Acme Plumbing or Self"
+                  className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-[#0F766E] outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  id="btn-cancel-edit-task"
+                  type="button"
+                  onClick={() => setEditingTask(null)}
+                  className="flex-1 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="btn-save-edit-task"
+                  type="submit"
+                  className="flex-1 py-2 bg-[#0F766E] text-white rounded-lg text-sm font-semibold hover:bg-[#115E59] shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[18px]">check</span>
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>

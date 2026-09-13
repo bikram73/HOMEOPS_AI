@@ -535,6 +535,43 @@ export function App() {
     }
   };
 
+  const handleEditTask = async (updatedTask: TaskItem) => {
+    const existing = tasks.find((t) => t.id === updatedTask.id);
+    const updated = tasks.map((t) => (t.id === updatedTask.id ? updatedTask : t));
+
+    // 1. Instantly update React state
+    setTasks(updated);
+    if (selectedTask?.id === updatedTask.id) {
+      setSelectedTask(updatedTask);
+    }
+
+    // 2. Instantly persist to Cookies, LocalStorage, Cache, and IndexedDB
+    saveStoredTasks(updated);
+
+    // 3. Log to Activity Calendar & Change History
+    if (existing) {
+      recordActivityEvent({
+        type: 'task',
+        action: 'task_updated',
+        title: `Updated task: ${updatedTask.title}`,
+        description: `Priority: ${updatedTask.priority} • Due: ${updatedTask.dueDate} • Category: ${updatedTask.category}`,
+        source: 'user',
+        entityType: 'task',
+        entityId: updatedTask.id,
+        entityName: updatedTask.title,
+        before: existing,
+        after: updatedTask,
+      });
+    }
+
+    // 4. Background server sync
+    try {
+      await api.syncStateWithServer({ tasks: updated as any });
+    } catch (e) {
+      console.warn('Server edit task sync fallback:', e);
+    }
+  };
+
   const handleDeleteTask = async (id: string) => {
     const target = tasks.find((t) => t.id === id);
     const updated = tasks.filter((t) => t.id !== id);
@@ -1021,6 +1058,7 @@ export function App() {
                 tasks={tasks}
                 onToggleTask={handleToggleTask}
                 onAddTask={handleAddTask}
+                onUpdateTask={handleEditTask}
                 selectedTask={selectedTask}
                 setSelectedTask={setSelectedTask}
                 onDeleteTask={handleDeleteTask}
@@ -1156,6 +1194,7 @@ export function App() {
                   tasks={tasks}
                   onToggleTask={handleToggleTask}
                   onAddTask={handleAddTask}
+                  onUpdateTask={handleEditTask}
                   selectedTask={selectedTask}
                   setSelectedTask={setSelectedTask}
                   onDeleteTask={handleDeleteTask}

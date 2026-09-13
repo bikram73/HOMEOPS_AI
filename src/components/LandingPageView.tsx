@@ -12,7 +12,24 @@ import {
   ExternalLink,
   Shield,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Send,
+  Bot,
+  Zap,
+  RefreshCw,
+  Sliders,
+  CheckCircle2,
+  Calendar,
+  Smartphone,
+  Layers,
+  Wrench,
+  HelpCircle,
+  ChevronRight,
+  Terminal,
+  Clock,
+  ShieldCheck,
+  TrendingDown,
+  ShoppingBag,
 } from 'lucide-react';
 
 interface LandingPageViewProps {
@@ -24,6 +41,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
   const [activeVideoTab, setActiveVideoTab] = useState<'overview' | 'tasks' | 'inventory' | 'bills'>('overview');
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [statusIndex, setStatusIndex] = useState(0);
+  const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
+  const [activeChannelTab, setActiveChannelTab] = useState<'telegram' | 'web' | 'automation'>('telegram');
 
   const rotatingPhrases = [
     'restock pantry essentials',
@@ -86,7 +105,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
           </div>
 
           {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden lg:flex items-center gap-7">
             <button
               onClick={() => onLaunchApp('tasks')}
               className="text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
@@ -110,6 +129,24 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
               className="text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
             >
               How it Works
+            </a>
+            <a
+              href="#architecture"
+              className="text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
+            >
+              Architecture
+            </a>
+            <a
+              href="#usage-channels"
+              className="text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
+            >
+              Usage & Channels
+            </a>
+            <a
+              href="#faq"
+              className="text-[14px] font-medium text-[#45464d] hover:text-[#006a63] transition-colors"
+            >
+              FAQ
             </a>
           </nav>
 
@@ -408,6 +445,498 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
               <span>Get Started with HomeOps AI</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+          </div>
+        </section>
+
+        {/* Section: Project Overview & Core Mission */}
+        <section id="project-overview" className="px-4 md:px-10 max-w-[1440px] mx-auto py-20 md:py-24 border-t border-[#c6c6cd]/50">
+          <div className="max-w-5xl mx-auto">
+            <div className="flex flex-col md:flex-row items-start md:items-end justify-between mb-12 gap-6">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider text-[#006a63] bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                  Project Mission
+                </span>
+                <h2 className="text-[28px] sm:text-[34px] font-bold text-[#000000] tracking-tight mt-3">
+                  Why HomeOps AI Exists
+                </h2>
+              </div>
+              <p className="text-[15px] sm:text-[16px] text-[#45464d] max-w-lg leading-relaxed">
+                Modern households operate like small businesses with logistics, maintenance schedules, budgets, and daily chores—yet rely on scattered memory, paper notes, and disjointed group chats.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white p-7 rounded-xl border border-[#c6c6cd]/70 shadow-xs hover:border-[#006a63] transition-all">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-[#006a63] mb-4">
+                  <TrendingDown className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Zero Mental Overhead</h3>
+                <p className="text-sm text-[#45464d] leading-relaxed">
+                  Offload chores, appliance checks, and grocery restocking to an autonomous system that plans ahead before stockouts or missed deadlines happen.
+                </p>
+              </div>
+
+              <div className="bg-white p-7 rounded-xl border border-[#c6c6cd]/70 shadow-xs hover:border-[#006a63] transition-all">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-[#006a63] mb-4">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Single Source of Truth</h3>
+                <p className="text-sm text-[#45464d] leading-relaxed">
+                  Consolidate chores, pantry items, scheduled appliance services, and utility bills into one synchronized engine accessible to every household member.
+                </p>
+              </div>
+
+              <div className="bg-white p-7 rounded-xl border border-[#c6c6cd]/70 shadow-xs hover:border-[#006a63] transition-all">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-[#006a63] mb-4">
+                  <Zap className="w-5 h-5" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Omnichannel Flow</h3>
+                <p className="text-sm text-[#45464d] leading-relaxed">
+                  Interact naturally where you already communicate: via Telegram bot, desktop dashboard, or voice-ready conversational assistant with idempotent webhooks.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Architecture & How the Engine Works */}
+        <section id="architecture" className="px-4 md:px-10 max-w-[1440px] mx-auto py-20 md:py-24 bg-[#f2f4f6]/60 rounded-2xl my-8">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-14">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#006a63] bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                Technical Architecture
+              </span>
+              <h2 className="text-[28px] sm:text-[34px] font-bold text-[#000000] tracking-tight mt-3 mb-3">
+                How HomeOps AI Works Under the Hood
+              </h2>
+              <p className="text-[16px] text-[#45464d] max-w-2xl mx-auto">
+                Built on a multi-layer pipeline: natural language understanding, deterministic state management, and real-time cross-channel synchronization.
+              </p>
+            </div>
+
+            {/* Architecture Pipeline Flow Diagram */}
+            <div className="bg-white p-8 rounded-2xl border border-[#c6c6cd]/70 shadow-sm mb-12">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 relative">
+                {/* Step 1 */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                        Layer 1
+                      </span>
+                      <Smartphone className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 mb-1">Inbound Omnichannel</h4>
+                    <p className="text-xs text-[#45464d] leading-relaxed">
+                      Accepts messages via Caspian webhook, Telegram Bot API, or web assistant chat.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-200 text-[11px] font-mono text-slate-500">
+                    POST /api/caspian/webhook
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                        Layer 2
+                      </span>
+                      <Bot className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 mb-1">NLU &amp; Intent Routing</h4>
+                    <p className="text-xs text-[#45464d] leading-relaxed">
+                      Gemini function calling parses tasks, bills, inventory quantities, and maintenance urgency.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-200 text-[11px] font-mono text-slate-500">
+                    Deterministic Fallback + Gemini 3.8
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                        Layer 3
+                      </span>
+                      <RefreshCw className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 mb-1">State &amp; Automations</h4>
+                    <p className="text-xs text-[#45464d] leading-relaxed">
+                      Central state manager updates records, computes thresholds, and auto-queues restocks.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-200 text-[11px] font-mono text-slate-500">
+                    Auto-Replenish &amp; Priority Engine
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="p-5 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200">
+                        Layer 4
+                      </span>
+                      <Send className="w-4 h-4 text-slate-400" />
+                    </div>
+                    <h4 className="text-base font-bold text-slate-900 mb-1">Outbound &amp; Audit</h4>
+                    <p className="text-xs text-[#45464d] leading-relaxed">
+                      Real-time confirmation dispatched back to channel + activity logged in calendar audit stream.
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-slate-200 text-[11px] font-mono text-slate-500">
+                    Audit Log &amp; Caspian Dispatch
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Core Subsystem Highlights */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-xl border border-[#c6c6cd]/70 flex gap-4 items-start">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 text-[#006a63] flex items-center justify-center shrink-0">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-slate-900 mb-1">Priority Ranking Engine</h4>
+                  <p className="text-sm text-[#45464d] leading-relaxed">
+                    When you ask <em>"What should I do right now?"</em>, the engine calculates a multi-factor score: Overdue utility bills (Weight: 100), Critical inventory (Weight: 80), Pending appliance maintenance (Weight: 60), and High-priority chores (Weight: 40).
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-xl border border-[#c6c6cd]/70 flex gap-4 items-start">
+                <div className="w-10 h-10 rounded-lg bg-teal-50 text-[#006a63] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-slate-900 mb-1">Anti-Hallucination Guardrails</h4>
+                  <p className="text-sm text-[#45464d] leading-relaxed">
+                    The agent strictly answers based on factual state. If an item or bill doesn't exist, it transparently tells you rather than inventing fake quantities or completed actions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Usage & Omnichannel Experience */}
+        <section id="usage-channels" className="px-4 md:px-10 max-w-[1440px] mx-auto py-20 md:py-24">
+          <div className="max-w-5xl mx-auto">
+            <div className="text-center mb-12">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#006a63] bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                Usage &amp; Interaction
+              </span>
+              <h2 className="text-[28px] sm:text-[34px] font-bold text-[#000000] tracking-tight mt-3 mb-3">
+                How to Use HomeOps AI in Daily Life
+              </h2>
+              <p className="text-[16px] text-[#45464d] max-w-2xl mx-auto">
+                Switch seamlessly between conversation on your phone and rich visual controls on your desktop.
+              </p>
+            </div>
+
+            {/* Interactive Channel Tabs */}
+            <div className="bg-white rounded-2xl border border-[#c6c6cd]/70 shadow-sm overflow-hidden">
+              <div className="flex border-b border-gray-200 bg-gray-50/80 p-2 gap-2">
+                <button
+                  onClick={() => setActiveChannelTab('telegram')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeChannelTab === 'telegram'
+                      ? 'bg-white text-[#006a63] shadow-xs border border-gray-200/80'
+                      : 'text-[#45464d] hover:text-black hover:bg-gray-100/60'
+                  }`}
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Telegram Messaging</span>
+                </button>
+                <button
+                  onClick={() => setActiveChannelTab('web')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeChannelTab === 'web'
+                      ? 'bg-white text-[#006a63] shadow-xs border border-gray-200/80'
+                      : 'text-[#45464d] hover:text-black hover:bg-gray-100/60'
+                  }`}
+                >
+                  <Bot className="w-4 h-4" />
+                  <span>Web App &amp; AI Chat</span>
+                </button>
+                <button
+                  onClick={() => setActiveChannelTab('automation')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    activeChannelTab === 'automation'
+                      ? 'bg-white text-[#006a63] shadow-xs border border-gray-200/80'
+                      : 'text-[#45464d] hover:text-black hover:bg-gray-100/60'
+                  }`}
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>Proactive Automations</span>
+                </button>
+              </div>
+
+              <div className="p-6 md:p-8">
+                {activeChannelTab === 'telegram' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div>
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200 mb-3 inline-block">
+                        Mobile On-The-Go
+                      </span>
+                      <h3 className="text-xl font-bold text-slate-900 mb-3">
+                        Talk to Your Household via Telegram
+                      </h3>
+                      <p className="text-sm text-[#45464d] leading-relaxed mb-4">
+                        Send quick voice or text notes while running errands. No need to download a separate heavy app—HomeOps AI lives directly in your Telegram inbox via Caspian.
+                      </p>
+                      <ul className="space-y-2 text-sm text-slate-700">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><em>"Add 6 bananas and milk to shopping list"</em></span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><em>"Mark electricity bill as paid"</em></span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><em>"What's urgent right now?"</em></span>
+                        </li>
+                      </ul>
+                      <div className="mt-6">
+                        <button
+                          onClick={() => onLaunchApp('assistant')}
+                          className="bg-[#006a63] text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-[#00504a] transition-all inline-flex items-center gap-2"
+                        >
+                          <span>Test Telegram Simulator in App</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-900 text-white p-5 rounded-xl font-mono text-xs shadow-md">
+                      <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-800 text-slate-400">
+                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                        <span>Telegram Inbound Webhook</span>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="bg-slate-800/70 p-2.5 rounded text-emerald-400">
+                          &gt; You: "Create a task to vacuum the hallway"
+                        </div>
+                        <div className="bg-slate-800/40 p-2.5 rounded text-slate-300">
+                          &lt; HomeOps AI: "Created task: 'Vacuum the hallway' (Priority: medium, Due: Today). Assigned to household chore board."
+                        </div>
+                        <div className="text-[11px] text-teal-300">
+                          ✓ Tool executed: createTask(title="vacuum the hallway")
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeChannelTab === 'web' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div>
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200 mb-3 inline-block">
+                        Command Center
+                      </span>
+                      <h3 className="text-xl font-bold text-slate-900 mb-3">
+                        Interactive Web Dashboard &amp; Assistant
+                      </h3>
+                      <p className="text-sm text-[#45464d] leading-relaxed mb-4">
+                        A responsive desktop and tablet command console. Inspect real-time pantry inventory meters, filter maintenance logs, track bills, and converse with the Gemini AI assistant.
+                      </p>
+                      <ul className="space-y-2 text-sm text-slate-700">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span>Direct state manipulation with one-click toggles</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span>Visual telemetry meters for water filters, HVAC, and salts</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span>Multi-member chore assignees and due status tags</span>
+                        </li>
+                      </ul>
+                      <div className="mt-6">
+                        <button
+                          onClick={() => onLaunchApp('home')}
+                          className="bg-[#006a63] text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-[#00504a] transition-all inline-flex items-center gap-2"
+                        >
+                          <span>Launch Web Dashboard</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 p-5 rounded-xl">
+                      <div className="text-xs font-bold text-slate-700 mb-3 flex items-center justify-between">
+                        <span>Real-Time Web State Sync</span>
+                        <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px]">Connected</span>
+                      </div>
+                      <div className="space-y-2.5 text-xs">
+                        <div className="bg-white p-2.5 rounded border border-slate-200 flex items-center justify-between">
+                          <span className="font-semibold text-slate-800">Laundry Detergent</span>
+                          <span className="text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded">Critical (18%)</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200 flex items-center justify-between">
+                          <span className="font-semibold text-slate-800">BESCOM Electricity</span>
+                          <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded">$145.20 • Due Tomorrow</span>
+                        </div>
+                        <div className="bg-white p-2.5 rounded border border-slate-200 flex items-center justify-between">
+                          <span className="font-semibold text-slate-800">HVAC Filter Clean</span>
+                          <span className="text-teal-600 font-bold bg-teal-50 px-2 py-0.5 rounded">Due in 4 Days</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {activeChannelTab === 'automation' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div>
+                      <span className="text-xs font-bold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded-md border border-teal-200 mb-3 inline-block">
+                        Autonomous Logic
+                      </span>
+                      <h3 className="text-xl font-bold text-slate-900 mb-3">
+                        Proactive Triggers &amp; Self-Healing Ops
+                      </h3>
+                      <p className="text-sm text-[#45464d] leading-relaxed mb-4">
+                        HomeOps AI doesn't just react to commands—it proactively monitors inventory thresholds, upcoming bill payment windows, and recurring appliance service milestones.
+                      </p>
+                      <ul className="space-y-2 text-sm text-slate-700">
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><strong>Automatic Restock:</strong> Items dropping below par automatically land on your shopping list.</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><strong>Deduplication Guard:</strong> Prevents multiple redundant shopping entries for the same item.</span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-[#006a63]" />
+                          <span><strong>Activity Audit Trail:</strong> Complete timestamped log of every mutation and automation.</span>
+                        </li>
+                      </ul>
+                      <div className="mt-6">
+                        <button
+                          onClick={() => onLaunchApp('activity')}
+                          className="bg-[#006a63] text-white px-5 py-2.5 rounded-lg text-xs font-bold hover:bg-[#00504a] transition-all inline-flex items-center gap-2"
+                        >
+                          <span>View Activity Audit Calendar</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-slate-900 text-white p-5 rounded-xl font-mono text-xs shadow-md">
+                      <div className="flex items-center gap-2 pb-3 mb-3 border-b border-slate-800 text-slate-400">
+                        <Zap className="w-4 h-4 text-amber-400" />
+                        <span>Automation Lifecycle Execution</span>
+                      </div>
+                      <div className="space-y-2 text-slate-300">
+                        <div className="text-emerald-400">&gt; Event: updateInventory("Rice", 0.5 kg)</div>
+                        <div className="text-amber-300">&gt; Trigger: Quantity &lt; Par Threshold (2.0 kg)</div>
+                        <div className="text-teal-300">&gt; Action: autoRestockAdded("Jasmine Rice", "1 bag")</div>
+                        <div className="text-slate-400">&gt; Audit: Logged to Activity Calendar [ACT-1725981234565]</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Frequently Asked Questions (FAQ) */}
+        <section id="faq" className="px-4 md:px-10 max-w-[1440px] mx-auto py-20 md:py-24 bg-[#f2f4f6]/60 rounded-2xl my-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#006a63] bg-teal-50 px-3 py-1 rounded-full border border-teal-200">
+                Got Questions?
+              </span>
+              <h2 className="text-[28px] sm:text-[34px] font-bold text-[#000000] tracking-tight mt-3 mb-3">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-[16px] text-[#45464d]">
+                Everything you need to know about HomeOps AI, privacy, and day-to-day operations.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                {
+                  q: 'What is HomeOps AI and how is it different from a basic todo app?',
+                  a: 'HomeOps AI is a full-stack household operations operating system. Unlike a static checklist, it features an intelligent agent powered by Gemini 3.8, proactive automatic replenishment, deterministic priority calculation, cross-channel messaging via Telegram and Caspian, appliance maintenance telemetry, and unified expense monitoring.'
+                },
+                {
+                  q: 'How does Telegram integration work?',
+                  a: 'You connect the HomeOps bot on Telegram. Inbound messages route through Caspian webhook ingestion to our backend intent router. The AI executes tools like createTask, addShoppingItem, or markBillPaid and dispatches instant confirmations back to your chat.'
+                },
+                {
+                  q: 'What happens if the AI model rate limit or network is unavailable?',
+                  a: 'HomeOps AI is built with graceful fallbacks. If an external AI API exceeds quota or errors out, our deterministic fallback NLP agent parses and executes all 7 core household tools (task creation, stock adjustments, shopping additions, bill payment, maintenance schedules, and priority ranking) with 100% reliability.'
+                },
+                {
+                  q: 'How does automatic grocery replenishment work?',
+                  a: 'Each pantry item has a configurable minimum threshold (par level). Whenever stock drops below this threshold (either manually in the app or via a voice/text update), HomeOps AI automatically queues it to your unified shopping list with deduplication guards.'
+                },
+                {
+                  q: 'Is my household data private and secure?',
+                  a: 'Yes. All authentication keys, bot tokens, and agent credentials remain strictly on the backend server. No API secrets are exposed to browser bundles, and audit trails record every mutation transparently in your activity calendar.'
+                }
+              ].map((faq, fIdx) => (
+                <div
+                  key={fIdx}
+                  className="bg-white rounded-xl border border-[#c6c6cd]/70 overflow-hidden shadow-xs"
+                >
+                  <button
+                    onClick={() => setExpandedFaq(expandedFaq === fIdx ? null : fIdx)}
+                    className="w-full text-left p-5 flex items-center justify-between font-semibold text-slate-900 hover:text-[#006a63] transition-colors"
+                  >
+                    <span className="text-[15px] sm:text-[16px] pr-4">{faq.q}</span>
+                    <ChevronRight
+                      className={`w-5 h-5 text-slate-400 transition-transform shrink-0 ${
+                        expandedFaq === fIdx ? 'rotate-90 text-[#006a63]' : ''
+                      }`}
+                    />
+                  </button>
+                  {expandedFaq === fIdx && (
+                    <div className="px-5 pb-5 pt-1 text-sm text-[#45464d] leading-relaxed border-t border-slate-100">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Section: Interactive Household Setup CTA */}
+        <section className="px-4 md:px-10 max-w-[1440px] mx-auto py-16 text-center">
+          <div className="max-w-3xl mx-auto bg-[#006a63] text-white rounded-3xl p-8 md:p-12 shadow-md">
+            <h2 className="text-[26px] sm:text-[34px] font-bold mb-3 tracking-tight">
+              Ready to Operationalize Your Household?
+            </h2>
+            <p className="text-[15px] sm:text-[17px] text-teal-100 max-w-xl mx-auto mb-8 leading-relaxed">
+              Launch the live dashboard right now. Experience real-time task rhythm, predictive pantry replenishment, and autonomous AI orchestration in action.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => onLaunchApp('home')}
+                className="bg-white text-[#006a63] px-8 py-3.5 rounded-lg text-[14px] font-bold hover:bg-teal-50 transition-all shadow-sm active:scale-95 inline-flex items-center justify-center gap-2"
+              >
+                <span>Launch HomeOps AI</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onLaunchApp('assistant')}
+                className="bg-teal-700/60 border border-teal-400/40 text-white px-8 py-3.5 rounded-lg text-[14px] font-bold hover:bg-teal-700 transition-all shadow-sm active:scale-95 inline-flex items-center justify-center gap-2"
+              >
+                <Bot className="w-4 h-4" />
+                <span>Try AI Assistant</span>
+              </button>
+            </div>
           </div>
         </section>
       </main>

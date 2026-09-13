@@ -50,6 +50,8 @@ export interface TelegramLiveStatus {
   botName: string;
   mode: 'caspian_hosted';
   status: 'connected' | 'configured' | 'unconfigured' | 'error';
+  isGatewayRunning: boolean;
+  gatewayError?: string;
   totalMessagesProcessed: number;
   lastActiveTimestamp?: string | null;
   lastError?: string;
@@ -57,6 +59,8 @@ export interface TelegramLiveStatus {
 
 export interface CaspianStatus {
   initialized: boolean;
+  isGatewayRunning: boolean;
+  gatewayError?: string | null;
   agentName: string;
   channel: string;
   hasApiKey: boolean;
@@ -72,6 +76,8 @@ export interface CaspianStatus {
 class CaspianIntegrationService {
   private caspianClient: Caspian | null = null;
   private isInitialized = false;
+  private isGatewayRunning = false;
+  private gatewayError: string | null = null;
   private initializationPromise: Promise<void> | null = null;
 
   private agentName = 'HomeOps-AI';
@@ -121,10 +127,11 @@ class CaspianIntegrationService {
 
   /**
    * 1. Idempotent Caspian v1 Hosted Initialization:
+   * Requires CASPIAN_API_KEY and TELEGRAM_BOT_TOKEN.
    * Instantiate Caspian -> Register onMessage -> Add Telegram Channel -> Start cx.run()
    */
   public async initCaspian(): Promise<void> {
-    if (this.isInitialized && this.caspianClient) {
+    if (this.isInitialized && this.isGatewayRunning && this.caspianClient) {
       console.log(`[Caspian] Already initialized and listening for ${this.agentName}.`);
       return;
     }
@@ -138,12 +145,24 @@ class CaspianIntegrationService {
       const baseUrl = this.getBaseUrl();
       const botToken = this.getBotToken();
 
-      if (!apiKey) {
-        console.warn('[Caspian] Missing CASPIAN_API_KEY');
-      }
+      // Enforce strict credential validation: Never mark initialized if credentials are missing
+      if (!apiKey || !botToken) {
+        this.isInitialized = false;
+        this.isGatewayRunning = false;
+        this.caspianClient = null;
+        this.gatewayError = !apiKey && !botToken
+          ? 'CASPIAN_API_KEY and TELEGRAM_BOT_TOKEN are missing in environment.'
+          : !apiKey
+          ? 'CASPIAN_API_KEY is missing in environment.'
+          : 'TELEGRAM_BOT_TOKEN is missing in environment.';
+        
+        console.warn(`[Caspian] Initialization halted: ${this.gatewayError}`);
 
-      if (!botToken) {
-        console.warn('[Caspian] Missing TELEGRAM_BOT_TOKEN');
+        if (botToken) {
+          await this.syncTelegramStatus();
+        }
+        await this.fetchLiveChannels();
+        return;
       }
 
       try {
@@ -169,7 +188,8 @@ class CaspianIntegrationService {
                 'Telegram',
                 senderId,
                 text,
-                eventId
+                eventId,
+                false // real Caspian hosted event, not simulation
               );
 
               // 4. Send clean outbound reply strictly through Caspian thread.post()
@@ -187,39 +207,47 @@ class CaspianIntegrationService {
         );
 
         // 1. Connect Telegram channel via Caspian hosted mode
-        if (botToken) {
-          await cx.channels.add('telegram', {
-            via: 'hosted',
-            bot_token: botToken,
-            botToken,
-          });
-          console.log(`[Caspian] Telegram channel registered for ${this.agentName}`);
-        }
+        await cx.channels.add('telegram', {
+          via: 'hosted',
+          bot_token: botToken,
+          botToken,
+        });
+        console.log(`[Caspian] Telegram channel registered for ${this.agentName}`);
 
         this.caspianClient = cx;
-        this.isInitialized = true;
-        console.log(`[Caspian] Connected & ready for ${this.agentName}`);
+        this.gatewayError = null;
 
         // 3. Start hosted Caspian event loop (cx.run)
-        if (apiKey) {
-          cx.run({
-            apiKey,
-            baseUrl,
-          }).catch((runErr: any) => {
-            console.log('[Caspian run background loop note]:', runErr?.message || runErr);
+        const runPromise = cx.run({
+          apiKey,
+          baseUrl,
+        });
+
+        // Track running state
+        this.isGatewayRunning = true;
+        this.isInitialized = true;
+        console.log(`[Caspian] Hosted gateway started & connected for ${this.agentName}`);
+
+        runPromise
+          .then(() => {
+            console.log('[Caspian] Hosted gateway loop ended cleanly.');
+            this.isGatewayRunning = false;
+          })
+          .catch((runErr: any) => {
+            this.isGatewayRunning = false;
+            this.isInitialized = false;
+            this.gatewayError = runErr?.message || 'Caspian hosted gateway runtime connection error';
+            console.error('[Caspian cx.run() error]:', this.gatewayError);
           });
-        }
       } catch (err: any) {
         this.isInitialized = false;
+        this.isGatewayRunning = false;
         this.caspianClient = null;
-        console.error('[Caspian] Initialization failed:', err?.message || err);
-        throw err;
+        this.gatewayError = err?.message || 'Caspian SDK initialization failed';
+        console.error('[Caspian] Initialization failed:', this.gatewayError);
       }
 
-      if (botToken) {
-        await this.syncTelegramStatus();
-      }
-
+      await this.syncTelegramStatus();
       await this.fetchLiveChannels();
     })().finally(() => {
       this.initializationPromise = null;
@@ -233,7 +261,12 @@ class CaspianIntegrationService {
    */
   public async syncTelegramStatus(): Promise<TelegramLiveStatus> {
     const token = this.getBotToken();
+    const apiKey = this.getApiKey();
+
     if (!token) {
+      this.cachedChannels = this.cachedChannels.map((c) =>
+        c.id === 'telegram' ? { ...c, status: 'standby' } : c
+      );
       return {
         hasToken: false,
         valid: false,
@@ -241,6 +274,8 @@ class CaspianIntegrationService {
         botName: 'HomeOps Bot',
         mode: 'caspian_hosted',
         status: 'unconfigured',
+        isGatewayRunning: false,
+        gatewayError: this.gatewayError || 'TELEGRAM_BOT_TOKEN is not configured',
         totalMessagesProcessed: this.totalMessages,
         lastActiveTimestamp: this.lastActiveTimestamp,
         lastError: 'TELEGRAM_BOT_TOKEN is not configured',
@@ -265,9 +300,28 @@ class CaspianIntegrationService {
       this.lastTelegramError = err.message || 'Failed to connect to Telegram API';
     }
 
-    const currentChannelStatus: 'connected' | 'configured' | 'standby' = 
-      this.isInitialized && this.telegramBotInfo.valid
-        ? (this.totalMessages > 0 ? 'connected' : 'configured')
+    // Determine honest status:
+    // If gateway has error or token invalid -> error
+    // If initialized + gateway running + token valid -> connected / configured
+    // If missing Caspian API key -> unconfigured (since hosted gateway cannot run without key)
+    let calculatedStatus: 'connected' | 'configured' | 'unconfigured' | 'error' = 'unconfigured';
+    if (!this.telegramBotInfo.valid && token) {
+      calculatedStatus = 'error';
+    } else if (this.gatewayError) {
+      calculatedStatus = 'error';
+    } else if (this.isInitialized && this.isGatewayRunning && this.telegramBotInfo.valid) {
+      calculatedStatus = this.totalMessages > 0 ? 'connected' : 'configured';
+    } else if (!apiKey) {
+      calculatedStatus = 'unconfigured';
+    } else {
+      calculatedStatus = 'unconfigured';
+    }
+
+    const currentChannelStatus: 'connected' | 'configured' | 'standby' =
+      calculatedStatus === 'connected'
+        ? 'connected'
+        : calculatedStatus === 'configured'
+        ? 'configured'
         : 'standby';
 
     this.cachedChannels = this.cachedChannels.map((c) => {
@@ -287,12 +341,12 @@ class CaspianIntegrationService {
       botUsername: this.telegramBotInfo.username,
       botName: this.telegramBotInfo.name,
       mode: 'caspian_hosted',
-      status: this.isInitialized && this.telegramBotInfo.valid 
-        ? (this.totalMessages > 0 ? 'connected' : 'configured')
-        : (this.telegramBotInfo.valid ? 'configured' : 'error'),
+      status: calculatedStatus,
+      isGatewayRunning: this.isGatewayRunning,
+      gatewayError: this.gatewayError || undefined,
       totalMessagesProcessed: this.totalMessages,
       lastActiveTimestamp: this.lastActiveTimestamp,
-      lastError: this.lastTelegramError || undefined,
+      lastError: this.lastTelegramError || this.gatewayError || undefined,
     };
   }
 
@@ -402,7 +456,8 @@ class CaspianIntegrationService {
     channel: string,
     senderId: string,
     messageText: string,
-    eventId?: string
+    eventId?: string,
+    isSimulation = false
   ) {
     const dedupeKey = eventId || `${channel}:${senderId}:${messageText.trim().toLowerCase()}`;
 
@@ -423,10 +478,11 @@ class CaspianIntegrationService {
     this.totalMessages++;
     this.lastActiveTimestamp = new Date().toLocaleTimeString();
 
+    const activitySourceTag = isSimulation ? `Simulator [${channel}]` : `Caspian [${channel}]`;
     stateManager.recordActivity(
-      `Caspian [${channel}] → Agent`,
+      `${activitySourceTag} → Agent`,
       `"${messageText.length > 35 ? messageText.substring(0, 32) + '...' : messageText}"`,
-      'telegram'
+      isSimulation ? 'web' : 'telegram'
     );
 
     // Process directly through Gemini Agent with deterministic Tools & State Mutators
@@ -441,8 +497,8 @@ class CaspianIntegrationService {
 
     // Record conversation message in persistent in-memory event store
     stateManager.addConversationMessage({
-      source: channel.toLowerCase() === 'telegram' ? 'telegram' : 'web',
-      channel,
+      source: isSimulation ? 'web' : (channel.toLowerCase() === 'telegram' ? 'telegram' : 'web'),
+      channel: isSimulation ? `${channel} (Simulator)` : channel,
       sender: senderId,
       text: messageText,
       response: agentResult.response,
@@ -461,6 +517,7 @@ class CaspianIntegrationService {
       response: agentResult.response,
       agentToolsExecuted: toolsExecuted,
       eventId: dedupeKey,
+      isSimulation,
     };
 
     // Cache processed event for idempotency
@@ -475,13 +532,28 @@ class CaspianIntegrationService {
 
   public getStatus(): CaspianStatus {
     const apiKey = this.getApiKey();
-    const currentTgStatus: 'connected' | 'configured' | 'standby' = 
-      this.isInitialized && this.telegramBotInfo.valid
-        ? (this.totalMessages > 0 ? 'connected' : 'configured')
-        : 'standby';
+    const token = this.getBotToken();
+
+    let calculatedStatus: 'connected' | 'configured' | 'unconfigured' | 'error' = 'unconfigured';
+    if (!this.telegramBotInfo.valid && token) {
+      calculatedStatus = 'error';
+    } else if (this.gatewayError) {
+      calculatedStatus = 'error';
+    } else if (this.isInitialized && this.isGatewayRunning && this.telegramBotInfo.valid) {
+      calculatedStatus = this.totalMessages > 0 ? 'connected' : 'configured';
+    } else if (!apiKey || !token) {
+      calculatedStatus = 'unconfigured';
+    } else {
+      calculatedStatus = 'unconfigured';
+    }
+
+    const currentChannelStatus: 'connected' | 'configured' | 'standby' = 
+      calculatedStatus === 'connected' ? 'connected' : calculatedStatus === 'configured' ? 'configured' : 'standby';
 
     return {
       initialized: this.isInitialized,
+      isGatewayRunning: this.isGatewayRunning,
+      gatewayError: this.gatewayError,
       agentName: this.agentName,
       channel: this.defaultChannel,
       hasApiKey: !!apiKey,
@@ -492,21 +564,21 @@ class CaspianIntegrationService {
       lastActive: this.lastActiveTimestamp,
       channels: this.cachedChannels.map((c) => ({
         ...c,
-        status: c.id === 'telegram' ? currentTgStatus : c.status,
+        status: c.id === 'telegram' ? currentChannelStatus : c.status,
         lastActive: c.id === 'telegram' ? this.lastActiveTimestamp : undefined,
       })),
       telegram: {
-        hasToken: !!this.getBotToken(),
+        hasToken: !!token,
         valid: this.telegramBotInfo.valid,
         botUsername: this.telegramBotInfo.username || this.getBotUsername(),
         botName: this.telegramBotInfo.name,
         mode: 'caspian_hosted',
-        status: this.isInitialized && this.telegramBotInfo.valid
-          ? (this.totalMessages > 0 ? 'connected' : 'configured')
-          : (this.telegramBotInfo.valid ? 'configured' : 'unconfigured'),
+        status: calculatedStatus,
+        isGatewayRunning: this.isGatewayRunning,
+        gatewayError: this.gatewayError || undefined,
         totalMessagesProcessed: this.totalMessages,
         lastActiveTimestamp: this.lastActiveTimestamp,
-        lastError: this.lastTelegramError || undefined,
+        lastError: this.lastTelegramError || this.gatewayError || undefined,
       },
     };
   }

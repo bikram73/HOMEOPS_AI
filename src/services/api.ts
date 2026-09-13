@@ -47,6 +47,8 @@ export interface TelegramLiveStatus {
   botName: string;
   mode: 'caspian_hosted';
   status: 'connected' | 'configured' | 'unconfigured' | 'error';
+  isGatewayRunning?: boolean;
+  gatewayError?: string;
   totalMessagesProcessed: number;
   lastActiveTimestamp?: string | null;
   lastError?: string;
@@ -54,6 +56,8 @@ export interface TelegramLiveStatus {
 
 export interface CaspianStatusResponse {
   initialized: boolean;
+  isGatewayRunning?: boolean;
+  gatewayError?: string | null;
   agentName: string;
   channel: string;
   hasApiKey: boolean;

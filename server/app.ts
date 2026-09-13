@@ -243,45 +243,32 @@ export function createExpressApp(): Express {
     res.json(status);
   });
 
-  // Webhook endpoint for live Caspian hosted bot updates / Telegram raw webhooks
-  app.post('/api/caspian/webhook', async (req: Request, res: Response) => {
-    try {
-      const parsed = caspianService.parseWebhookPayload(req.body);
-      if (!parsed || !parsed.text) {
-        return res.status(200).json({ ok: true, note: 'Ignored non-text payload' });
-      }
-
-      const result = await caspianService.handleIncomingMessage(
-        parsed.channel,
-        parsed.senderId,
-        parsed.text,
-        parsed.eventId
-      );
-
-      res.status(200).json({
-        ok: true,
-        response: result.response,
-        tools: result.agentToolsExecuted,
-        eventId: result.eventId,
-      });
-    } catch (err: any) {
-      console.error('[Caspian Webhook Error]', err);
-      res.status(500).json({ error: err.message || 'Webhook processing failed' });
-    }
+  // Webhook deprecation handler: Enforces single true inbound path (Caspian Hosted Gateway via cx.run)
+  app.all('/api/caspian/webhook', (_req: Request, res: Response) => {
+    res.status(410).json({
+      ok: false,
+      error: 'Webhook endpoint is disabled.',
+      mode: 'caspian_hosted',
+      architecture: 'Telegram -> Caspian Hosted -> cx.onMessage() -> HomeOps AI -> thread.post() -> Telegram',
+      message: 'HomeOps AI uses the official Caspian 1.0 Hosted Gateway loop (cx.run). Inbound webhooks are neither needed nor accepted.',
+    });
   });
 
+  // In-app interactive simulator for testing Agent & Tools without requiring active Telegram connection
   app.post('/api/caspian/simulate', async (req: Request, res: Response) => {
     const { text, channel, senderId, eventId } = req.body;
     if (!text) return res.status(400).json({ error: 'Text message is required' });
 
     const result = await caspianService.handleIncomingMessage(
       channel || 'Telegram',
-      senderId || 'telegram_user_101',
+      senderId || 'Web Preview Simulator',
       text,
-      eventId
+      eventId,
+      true // isSimulation flag: explicit distinction from live Caspian hosted messages
     );
     res.json({
       ...result,
+      isSimulation: true,
       updatedState: stateManager.getState(),
     });
   });

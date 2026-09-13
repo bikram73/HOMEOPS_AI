@@ -200,7 +200,7 @@ This ensures that any message sent via Telegram or another connected channel exe
 1. User sends message via Telegram (@MyHomeOps_bot) or Web UI
                         │
                         ▼
-2. Caspian Hosted Gateway receives the webhook and forwards to /api/caspian/webhook
+2. Caspian Hosted Gateway receives Telegram update and forwards via hosted connection loop to cx.onMessage()
                         │
                         ▼
 3. HomeOps Express server parses the intent and passes payload to Gemini 2.5 Flash
@@ -258,7 +258,7 @@ This ensures that any message sent via Telegram or another connected channel exe
 │       └── api.ts                # Serverless Express entry point for Netlify
 ├── server/
 │   ├── app.ts                    # Express application instance & REST routes
-│   ├── caspian.ts                # Caspian SDK multi-channel gateway & webhook handler
+│   ├── caspian.ts                # Caspian SDK 1.0 hosted gateway listener (cx.run & thread.post)
 │   ├── gemini.ts                 # Google Gemini 2.5 Flash agent reasoning & tool declarations
 │   ├── state.ts                  # In-memory unified household state manager
 │   ├── tools.ts                  # Deterministic household calculation tools
@@ -367,14 +367,14 @@ npm start
 
 ```
                                   MULTI-CHANNEL INGRESS
-  [Telegram Bot @MyHomeOps_bot]   [In-App Channel Simulator]   [External Webhooks]
-                │                             │                         │
-                └─────────────────────────────┼─────────────────────────┘
-                                              ▼
-                                 [Caspian Hosted Gateway]
-                               (https://api.trycaspianai.com)
-                                              │
-                                              ▼ Webhook POST /api/caspian/webhook
+  [Telegram Bot @MyHomeOps_bot]   [Email / Forwarding]   [Slack / Discord / SMS]
+                │                          │                        │
+                └──────────────────────────┼────────────────────────┘
+                                           ▼
+                              [Caspian Hosted Gateway]
+                            (https://api.trycaspianai.com)
+                                           │
+                                           ▼ Event Loop (cx.run & onMessage)
                    ┌───────────────────────────────────────────┐
                    │            HomeOps AI Backend             │
                    │                                           │
@@ -404,8 +404,10 @@ npm start
                    ┌─────────────────────┴─────────────────────┐
                    ▼                                           ▼
        [Reactive React 18 UI]                     [Outbound Telegram/Channel]
-   (Live Visuals & Activity Logs)                  (Automated Instant Reply)
+    (Live SSE /api/events & REST)                 (via Caspian thread.post())
 ```
+
+
 
 ---
 
@@ -462,7 +464,7 @@ HomeOps AI employs a resilient **multi-tier hybrid persistence architecture** co
 ## 📄 Challenge Deliverables
 
 - [x] **Full-Stack Autonomous Web App**: React 18 + Vite frontend with Node.js/Express backend.
-- [x] **Caspian SDK Multi-Channel Integration**: Connected to `@MyHomeOps_bot` on Telegram with inbound webhook processing.
+- [x] **Caspian SDK Multi-Channel Integration**: Connected to `@MyHomeOps_bot` on Telegram with hosted channel listener (`cx.run()`).
 - [x] **Interactive Multi-Channel Simulator**: Built-in tester to verify message flows across channels.
 - [x] **Agentic Tool Calling**: Gemini 2.5 Flash integrated with structured tools for tasks, inventory, shopping, bills, and maintenance.
 - [x] **"What Should I Do Now?" Engine**: Deterministic urgency scoring for instant household prioritization.
@@ -498,7 +500,7 @@ HomeOps AI employs a resilient **multi-tier hybrid persistence architecture** co
 ### Caspian & Multi-Channel
 - `GET /api/caspian/status` — Connection status, active channels, and message counter.
 - `GET /api/caspian/channels` — Queries supported channels from Caspian Gateway.
-- `POST /api/caspian/webhook` — Webhook endpoint for inbound messages from Telegram/Caspian.
+- `GET /api/events` — Server-Sent Events (SSE) stream for real-time state & message event broadcast.
 - `POST /api/caspian/simulate` — Interactive in-app channel message simulator.
 
 ### Household Entities

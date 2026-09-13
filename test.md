@@ -48,7 +48,7 @@ A comprehensive automated test suite was executed against the **HomeOps AI** pla
 | **NLU** | Natural language disambiguation, clarification prompts, and edge cases | 3 | 3 | 100% |
 | **SAFE** | Read-only query safety and destructive action safeguards | 4 | 4 | 100% |
 | **CAS** | Caspian messaging service initialization, channel registry, and dispatch | 5 | 5 | 100% |
-| **TG** | Telegram webhook handling, bi-directional chats, and state mutations | 8 | 8 | 100% |
+| **TG** | Telegram hosted gateway handling, bi-directional chats, and state mutations | 8 | 8 | 100% |
 | **OUT** | Outbound message dispatch routing, channel fallbacks, and error guards | 4 | 4 | 100% |
 | **VALID** | HTTP input validation, 404 handlers, and parameter type checking | 5 | 5 | 100% |
 | **ERR** | Network timeout resilience, Gemini quota fallbacks, and error masking | 5 | 5 | 100% |
@@ -213,33 +213,33 @@ A comprehensive automated test suite was executed against the **HomeOps AI** pla
 | `SAFE-003` | Recommendation Query Safety | Inquiring for advice does not delete or complete items | **PASS** |
 | `SAFE-004` | Unspecified Deletion Guard | Bulk deletion queries rejected without explicit confirmation | **PASS** |
 
-### 3.17 Caspian Integration & Messaging Pipeline (`CAS`)
+### 3.17 Caspian 1.0 Hosted Gateway Pipeline (`CAS`)
 | Test ID | Test Name | Expected Behavior | Status |
 | :--- | :--- | :--- | :---: |
-| `CAS-001` | Caspian Messaging Service Initialization | Service instantiates with client registry and fallback modes | **PASS** |
-| `CAS-002` | Channel Registration Inspection | Channels (`telegram`, `dashboard`) registered in metadata | **PASS** |
-| `CAS-003` | Incoming Webhook Ingestion | `POST /api/webhook/caspian` validates payload and routes | **PASS** |
-| `CAS-004` | Telegram -> Caspian -> Agent Processing Flow | Inbound Telegram webhook processes through AI pipeline | **PASS** |
-| `CAS-005` | Caspian Outbound Dispatch Pipeline | Outbound message formatted with recipient and channel tags | **PASS** |
+| `CAS-001` | Caspian SDK 1.0 Client Initialization | Service instantiates `new Caspian()` with `cx.channels.add()` and `cx.run()` loop | **PASS** |
+| `CAS-002` | Channel Registration Inspection | Channels (`telegram`, etc.) registered with `{ via: 'hosted' }` | **PASS** |
+| `CAS-003` | Strict Credentials & Health Validation | Missing keys set `initialized: false` and surface descriptive gateway errors | **PASS** |
+| `CAS-004` | Telegram -> Caspian Hosted -> Agent Flow | Inbound Telegram message via `cx.onMessage()` routes through Gemini Agent | **PASS** |
+| `CAS-005` | Outbound Dispatch via `thread.post()` | Normalized response dispatched directly back to Telegram via `thread.post()` | **PASS** |
 
-### 3.18 Telegram Integration (`TG`)
+### 3.18 Telegram Integration via Hosted Gateway (`TG`)
 | Test ID | Test Name | Expected Behavior | Status |
 | :--- | :--- | :--- | :---: |
-| `TG-001` | Telegram Bot Configuration Status | `GET /api/telegram/status` returns operational telemetry | **PASS** |
-| `TG-002` | Telegram Basic Message Response | Telegram text webhook receives clean conversational reply | **PASS** |
+| `TG-001` | Telegram Bot Configuration Status | `GET /api/telegram/status` returns operational telemetry & live verification | **PASS** |
+| `TG-002` | Telegram Basic Message Response | Inbound message receives clean conversational reply from HomeOps AI | **PASS** |
 | `TG-003` | Create Task Through Telegram | Telegram message creates task in core state | **PASS** |
 | `TG-004` | Update Inventory Through Telegram | Telegram message updates inventory stock in core state | **PASS** |
 | `TG-005` | Add Shopping Item Through Telegram | Telegram grocery message updates shopping list | **PASS** |
 | `TG-006` | What Should I Do Now Through Telegram | Telegram command returns top priority triage recommendation | **PASS** |
 | `TG-007` | Unknown Information Handling Through Telegram | Telegram truthfully reports missing items without hallucination | **PASS** |
-| `TG-008` | Full State Mutation Chain via Telegram Webhook | Webhook alters state and dispatches outbound message | **PASS** |
+| `TG-008` | Full State Mutation Chain via Caspian Hosted | Message alters in-memory state and updates real-time SSE stream | **PASS** |
 
-### 3.19 Outbound Message Dispatch (`OUT`)
+### 3.19 Outbound Message Dispatch & Safety (`OUT`)
 | Test ID | Test Name | Expected Behavior | Status |
 | :--- | :--- | :--- | :---: |
-| `OUT-001` | Single Outbound Dispatch Guard | No duplicate message transmission for a single inbound trigger | **PASS** |
-| `OUT-002` | Caspian Client Outbound Priority | Caspian SDK preferred for outbound dispatch when configured | **PASS** |
-| `OUT-003` | Telegram Bot API Fallback | Standard Telegram Bot API invoked when Caspian channel is idle | **PASS** |
+| `OUT-001` | Single Ingress/Egress Pipeline Guard | Eliminates dual paths (webhooks disabled in favor of `cx.run` loop) | **PASS** |
+| `OUT-002` | Thread Post Dispatch Delivery | `thread.post(result.response)` dispatches clean, normalized replies | **PASS** |
+| `OUT-003` | Idempotency & Deduplication Guard | Duplicate event IDs detected and served from cache without re-mutation | **PASS** |
 | `OUT-004` | Safe Error Logging on Channel Outage | Channel outages logged safely without bubbling fatal errors | **PASS** |
 
 ### 3.20 Validation & Error Handling (`VALID` & `ERR`)

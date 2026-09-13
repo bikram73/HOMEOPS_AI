@@ -158,13 +158,25 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-base font-bold text-white tracking-tight">Caspian Multi-Channel &amp; Telegram Gateway</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  Caspian Gateway Active
-                </span>
+                {status?.initialized && status?.isGatewayRunning ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Caspian Hosted Active
+                  </span>
+                ) : status?.gatewayError ? (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-rose-400" />
+                    Gateway Error
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3 text-amber-400" />
+                    Gateway Standby
+                  </span>
+                )}
               </div>
               <p className="text-xs text-gray-400">
-                Agent: <strong className="text-teal-300">{status?.agentName || 'HomeOps-AI'}</strong> • Single message handler for Telegram and multi-channel events
+                Agent: <strong className="text-teal-300">{status?.agentName || 'HomeOps-AI'}</strong> • Caspian 1.0 Hosted Gateway loop (<code className="text-gray-300 font-mono text-[10px]">cx.run</code> &bull; <code className="text-gray-300 font-mono text-[10px]">onMessage</code>)
               </p>
             </div>
           </div>
@@ -193,6 +205,10 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
               ) : tgStatus?.status === 'configured' ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">
                   <CheckCircle className="w-3 h-3 text-sky-600" /> Configured &amp; Listening
+                </span>
+              ) : tgStatus?.status === 'error' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                  <AlertTriangle className="w-3 h-3 text-rose-600" /> Connection Error
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
@@ -228,9 +244,9 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
             <div className="flex items-center gap-2 text-slate-700">
               <Radio className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
               <span>
-                Caspian Architecture:{' '}
+                Caspian Pipeline:{' '}
                 <strong className="text-slate-900">
-                  Hosted Gateway (cx.run &bull; onMessage &bull; thread.post)
+                  Telegram &rarr; Caspian Hosted &rarr; cx.onMessage() &rarr; HomeOps AI &rarr; thread.post()
                 </strong>
               </span>
             </div>
@@ -250,6 +266,15 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
             </div>
           </div>
 
+          {(status?.gatewayError || tgStatus?.lastError) && (
+            <div className="p-2 rounded-md bg-rose-50 border border-rose-200 text-rose-900 text-[11px] flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              <span>
+                Gateway Notice: {status?.gatewayError || tgStatus?.lastError}
+              </span>
+            </div>
+          )}
+
           {actionNotice && (
             <div className="p-2 rounded-md bg-teal-50 border border-teal-200 text-teal-900 text-[11px] flex items-center gap-1.5 animate-in fade-in">
               <CheckCircle className="w-3.5 h-3.5 text-teal-600 shrink-0" />
@@ -258,34 +283,41 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
           )}
         </div>
 
-        {/* Channel Selector */}
-        <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center gap-2 overflow-x-auto scrollbar-hide text-xs">
-          <span className="text-slate-400 font-medium shrink-0">Channel:</span>
-          {(channels.length > 0 ? channels : [
-            { id: 'telegram', name: 'Telegram', status: 'connected' },
-            { id: 'email', name: 'Email', status: 'available' },
-            { id: 'slack', name: 'Slack', status: 'available' },
-            { id: 'discord', name: 'Discord', status: 'available' },
-            { id: 'sms', name: 'Phone / SMS', status: 'available' },
-          ]).map((ch: any) => {
-            const isSelected = activeChannel.toLowerCase() === ch.name.toLowerCase() || (activeChannel === 'Telegram' && ch.id === 'telegram');
-            return (
-              <button
-                key={ch.id}
-                onClick={() => setActiveChannel(ch.name)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-[#006a63] text-white shadow-xs'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                <span>{ch.name}</span>
-                {ch.status === 'connected' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                )}
-              </button>
-            );
-          })}
+        {/* Channel Selector & Simulator Disclaimer Banner */}
+        <div className="px-6 py-2 bg-white border-b border-gray-100 flex items-center justify-between gap-2 overflow-x-auto text-xs">
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-slate-400 font-medium shrink-0">Channel:</span>
+            {(channels.length > 0 ? channels : [
+              { id: 'telegram', name: 'Telegram', status: 'connected' },
+              { id: 'email', name: 'Email', status: 'available' },
+              { id: 'slack', name: 'Slack', status: 'available' },
+              { id: 'discord', name: 'Discord', status: 'available' },
+              { id: 'sms', name: 'Phone / SMS', status: 'available' },
+            ]).map((ch: any) => {
+              const isSelected = activeChannel.toLowerCase() === ch.name.toLowerCase() || (activeChannel === 'Telegram' && ch.id === 'telegram');
+              return (
+                <button
+                  key={ch.id}
+                  onClick={() => setActiveChannel(ch.name)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-[#006a63] text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <span>{ch.name}</span>
+                  {ch.status === 'connected' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1.5 text-[10px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+            <Sparkles className="w-3 h-3 text-teal-600 shrink-0" />
+            <span>Interactive Simulator Preview: Tests Agent Tools locally</span>
+          </div>
         </div>
 
         {/* Simulated Chat Window */}

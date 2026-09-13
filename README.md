@@ -153,7 +153,7 @@ Instead of building and maintaining separate, siloed bot servers for Telegram, D
                     React Dashboard
 ```
 
-This ensures that any message sent via Telegram or another connected channel executes the exact same underlying household tools, mutates the unified state, and immediately updates the live React web dashboard.
+This ensures that any message sent via Telegram or another connected channel executes the exact same underlying household tools, mutates the unified state, and immediately broadcasts updates to the live React web dashboard via Server-Sent Events ().
 
 ---
 
@@ -260,7 +260,7 @@ This ensures that any message sent via Telegram or another connected channel exe
 │   ├── app.ts                    # Express application instance & REST routes
 │   ├── caspian.ts                # Caspian SDK 1.0 hosted gateway listener (cx.run & thread.post)
 │   ├── gemini.ts                 # Google Gemini 2.5 Flash agent reasoning & tool declarations
-│   ├── state.ts                  # In-memory unified household state manager
+│   ├── state.ts                  # In-memory unified household state & conversation store
 │   ├── tools.ts                  # Deterministic household calculation tools
 │   └── types.ts                  # Backend TypeScript interfaces
 ├── server.ts                     # Local / Container Express + Vite entry point
@@ -498,8 +498,10 @@ HomeOps AI employs a resilient **multi-tier hybrid persistence architecture** co
 - `GET /api/agent/weekly-plan` — Generates a balanced 7-day chore schedule.
 
 ### Caspian & Multi-Channel
-- `GET /api/caspian/status` — Connection status, active channels, and message counter.
-- `GET /api/caspian/channels` — Queries supported channels from Caspian Gateway.
+- `GET /api/caspian/status` — Caspian SDK 1.0 connection status, active channels, message counter, and gateway health.
+- `GET /api/telegram/status` — Live Telegram bot configuration and connectivity verification.
+- `GET /api/caspian/channels` — Queries supported channels from Caspian Hosted Gateway.
+- `GET /api/conversations` — Retrieves persistent multi-channel message and response history.
 - `GET /api/events` — Server-Sent Events (SSE) stream for real-time state & message event broadcast.
 - `POST /api/caspian/simulate` — Interactive in-app channel message simulator.
 

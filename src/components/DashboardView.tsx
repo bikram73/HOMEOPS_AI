@@ -3,6 +3,7 @@ import { PageTab, TaskItem, InventoryItem, ShoppingItem, BillItem, MaintenanceIt
 import { HERO_IMAGE_URL } from '../data/mockData';
 import { Sparkles, Calendar, Zap, MessageSquare, Trash2, RotateCcw } from 'lucide-react';
 import { ReturningUserGreeting } from './ReturningUserGreeting';
+import { LiveActivityFeed } from './LiveActivityFeed';
 import { getTimeGreeting } from '../utils/timeGreeting';
 import { hasEnteredUserDetails } from '../utils/demoDataHelper';
 import { getLocalDateString } from '../utils/activityStore';
@@ -24,6 +25,7 @@ interface DashboardViewProps {
   onOpenWeeklyPlanModal?: () => void;
   onOpenCaspianModal?: () => void;
   onClearAllDemoData?: () => void;
+  onRefreshState?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -42,6 +44,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenWeeklyPlanModal,
   onOpenCaspianModal,
   onClearAllDemoData,
+  onRefreshState,
 }) => {
   const [isAiCardDismissed, setIsAiCardDismissed] = useState(false);
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
@@ -526,6 +529,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               )}
             </ul>
           </div>
+
+          {/* Live Telegram & Caspian Hosted Event Stream */}
+          <LiveActivityFeed
+            onOpenCaspianModal={onOpenCaspianModal}
+            onRefreshState={onRefreshState}
+          />
 
           {/* Featured Image / Living Room Card */}
           <div

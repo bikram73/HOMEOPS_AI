@@ -10,6 +10,8 @@ import {
   ActivityEvent,
   ActivitySource,
   ActivityType,
+  ConversationMessage,
+  LiveEventPayload,
 } from './types';
 
 // Helper functions for dates & times
@@ -33,6 +35,7 @@ export function getRelativeDateString(daysOffset: number): string {
 // In-Memory Ephemeral State (Hackathon MVP: session-based, no external database required)
 class StateManager {
   private state: HomeState;
+  private sseClients: Set<(data: string) => void> = new Set();
 
   constructor() {
     this.state = this.getInitialSeedState();
@@ -465,6 +468,57 @@ class StateManager {
           entityName: 'Pantry Optimization Plan',
         },
       ],
+      conversations: [
+        {
+          id: 'msg-seed-1',
+          source: 'telegram',
+          channel: 'Telegram',
+          sender: '@household_alex',
+          text: "We're running low on detergent.",
+          response: 'Updated Laundry Detergent status to critical and automatically added 1 bottle to your shopping list.',
+          agentToolsExecuted: ['updateInventory', 'addShoppingItem'],
+          timestamp: `${getLocalDateString()}T10:02:00.000Z`,
+          date: getLocalDateString(),
+          time: '10:02 AM',
+          impact: {
+            inventoryUpdated: true,
+            shoppingAdded: true,
+            summary: 'Detergent flagged low & queued for restock',
+          },
+        },
+        {
+          id: 'msg-seed-2',
+          source: 'telegram',
+          channel: 'Telegram',
+          sender: '@household_alex',
+          text: 'What bills are due soon?',
+          response: 'City Electricity Board ($145.20) is due tomorrow at 6:00 PM, and Fiber Internet ($69.99, AutoPay) is due in 5 days.',
+          agentToolsExecuted: ['queryBills'],
+          timestamp: `${getLocalDateString()}T09:15:00.000Z`,
+          date: getLocalDateString(),
+          time: '09:15 AM',
+          impact: {
+            billUpdated: false,
+            summary: 'Analyzed 2 pending household bills',
+          },
+        },
+        {
+          id: 'msg-seed-3',
+          source: 'telegram',
+          channel: 'Telegram',
+          sender: '@household_sarah',
+          text: 'Add 2 kg jasmine rice to pantry',
+          response: 'Added Jasmine Rice (2 kg) to Pantry inventory with threshold tracking set to 1 kg.',
+          agentToolsExecuted: ['updateInventory'],
+          timestamp: `${getRelativeDateString(-1)}T18:40:00.000Z`,
+          date: getRelativeDateString(-1),
+          time: '06:40 PM',
+          impact: {
+            inventoryUpdated: true,
+            summary: 'Pantry rice inventory updated',
+          },
+        },
+      ],
       analytics: {
         activeUsers: 18,
         messages: 642,
@@ -483,7 +537,82 @@ class StateManager {
 
   public resetState(): HomeState {
     this.state = this.getInitialSeedState();
+    this.broadcastSSE({
+      type: 'state_updated',
+      data: { state: this.state },
+      timestamp: new Date().toISOString(),
+    });
     return this.state;
+  }
+
+  // --- Real-time SSE Broadcasting ---
+  public subscribeSSE(sendFn: (data: string) => void): () => void {
+    this.sseClients.add(sendFn);
+    return () => {
+      this.sseClients.delete(sendFn);
+    };
+  }
+
+  public broadcastSSE(event: LiveEventPayload): void {
+    const payloadStr = JSON.stringify(event);
+    for (const sendFn of this.sseClients) {
+      try {
+        sendFn(payloadStr);
+      } catch (e) {
+        this.sseClients.delete(sendFn);
+      }
+    }
+  }
+
+  // --- Conversation Store Methods ---
+  public addConversationMessage(data: {
+    source?: 'telegram' | 'web' | 'email' | 'slack' | 'discord' | 'sms';
+    channel?: string;
+    sender?: string;
+    text: string;
+    response?: string;
+    agentToolsExecuted?: string[];
+    impact?: ConversationMessage['impact'];
+  }): ConversationMessage {
+    const now = new Date();
+    const id = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const msg: ConversationMessage = {
+      id,
+      source: data.source || 'telegram',
+      channel: data.channel || 'Telegram',
+      sender: data.sender || 'telegram-user',
+      text: data.text,
+      response: data.response,
+      agentToolsExecuted: data.agentToolsExecuted,
+      timestamp: now.toISOString(),
+      date: getLocalDateString(now),
+      time: formatLocalTime(now),
+      impact: data.impact,
+    };
+
+    if (!Array.isArray(this.state.conversations)) {
+      this.state.conversations = [];
+    }
+    this.state.conversations.unshift(msg);
+    if (this.state.conversations.length > 500) {
+      this.state.conversations.pop();
+    }
+
+    // Immediately push to live connected web dashboard clients via SSE
+    this.broadcastSSE({
+      type: 'conversation_created',
+      data: {
+        conversation: msg,
+        state: this.getState(),
+      },
+      timestamp: now.toISOString(),
+    });
+
+    return msg;
+  }
+
+  public getConversations(limit: number = 50): ConversationMessage[] {
+    return (this.state.conversations || []).slice(0, limit);
   }
 
   // --- Task Methods ---
@@ -1172,6 +1301,16 @@ class StateManager {
 
     // Also update legacy activities list
     this.recordActivity(event.title, event.description || event.action);
+
+    // Push real-time update to all active browser dashboard clients
+    this.broadcastSSE({
+      type: 'state_updated',
+      data: {
+        activity: fullEvent,
+        state: this.getState(),
+      },
+      timestamp,
+    });
 
     return fullEvent;
   }

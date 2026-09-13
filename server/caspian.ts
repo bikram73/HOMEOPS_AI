@@ -431,10 +431,35 @@ class CaspianIntegrationService {
 
     // Process directly through Gemini Agent with deterministic Tools & State Mutators
     const agentResult = await processUserMessage(messageText);
+    const toolsExecuted = agentResult.toolsExecuted?.map((t) => t.toolName) || [];
+
+    const isInventoryUpdated = toolsExecuted.some((t) => t.toLowerCase().includes('inventory'));
+    const isShoppingAdded = toolsExecuted.some((t) => t.toLowerCase().includes('shop'));
+    const isTaskCreated = toolsExecuted.some((t) => t.toLowerCase().includes('task'));
+    const isBillUpdated = toolsExecuted.some((t) => t.toLowerCase().includes('bill'));
+    const isMaintenanceCreated = toolsExecuted.some((t) => t.toLowerCase().includes('maint'));
+
+    // Record conversation message in persistent in-memory event store
+    stateManager.addConversationMessage({
+      source: channel.toLowerCase() === 'telegram' ? 'telegram' : 'web',
+      channel,
+      sender: senderId,
+      text: messageText,
+      response: agentResult.response,
+      agentToolsExecuted: toolsExecuted,
+      impact: {
+        inventoryUpdated: isInventoryUpdated,
+        shoppingAdded: isShoppingAdded,
+        taskCreated: isTaskCreated,
+        billUpdated: isBillUpdated,
+        maintenanceCreated: isMaintenanceCreated,
+        summary: toolsExecuted.length > 0 ? `Executed: ${toolsExecuted.join(', ')}` : 'Agent response',
+      },
+    });
 
     const finalResult = {
       response: agentResult.response,
-      agentToolsExecuted: agentResult.toolsExecuted?.map((t) => t.toolName) || [],
+      agentToolsExecuted: toolsExecuted,
       eventId: dedupeKey,
     };
 

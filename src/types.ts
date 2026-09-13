@@ -191,6 +191,37 @@ export interface StoredHouseholdData {
   conversations?: ChatMessage[];
 }
 
+export interface ConversationMessage {
+  id: string;
+  source: 'telegram' | 'web' | 'email' | 'slack' | 'discord' | 'sms';
+  channel: 'telegram' | 'web' | 'email' | 'slack' | 'discord' | 'sms' | string;
+  sender: string;
+  text: string;
+  response?: string;
+  agentToolsExecuted?: string[];
+  timestamp: string; // ISO string
+  date: string; // YYYY-MM-DD
+  time: string; // e.g. "8:24 PM"
+  impact?: {
+    inventoryUpdated?: boolean;
+    shoppingAdded?: boolean;
+    taskCreated?: boolean;
+    billUpdated?: boolean;
+    maintenanceCreated?: boolean;
+    summary?: string;
+  };
+}
+
+export interface LiveEventPayload {
+  type: 'conversation_created' | 'state_updated' | 'activity_created';
+  data: {
+    conversation?: ConversationMessage;
+    activity?: ActivityEvent;
+    state?: any;
+  };
+  timestamp: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';

@@ -254,6 +254,44 @@ export function App() {
     }
   }, []);
 
+  // Initialize from client persistence (IndexedDB + localStorage) on mount & establish SSE stream
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource('/api/events');
+        eventSource.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload.type === 'state_updated' || payload.type === 'conversation_created') {
+              syncServerState();
+            }
+          } catch (e) {
+            // Ignore parse errors from heartbeat/comments
+          }
+        };
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          reconnectTimeout = setTimeout(connectSSE, 4000);
+        };
+      } catch {
+        reconnectTimeout = setTimeout(connectSSE, 5000);
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [syncServerState]);
+
   // Initialize from client persistence (IndexedDB + localStorage) on mount
   useEffect(() => {
     const initializeAppData = async () => {
@@ -1109,6 +1147,7 @@ export function App() {
                   onOpenBriefingModal={() => setIsBriefingOpen(true)}
                   onOpenWeeklyPlanModal={() => setIsWeeklyPlanOpen(true)}
                   onOpenCaspianModal={() => setIsCaspianOpen(true)}
+                  onRefreshState={syncServerState}
                 />
               )}
 

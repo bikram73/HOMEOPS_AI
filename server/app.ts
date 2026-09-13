@@ -286,6 +286,49 @@ export function createExpressApp(): Express {
     });
   });
 
+  // Live SSE Stream for real-time dashboard updates from Telegram / Caspian / HomeOps Agent
+  app.get('/api/events', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    // Send initial connection sync
+    const initialPayload = JSON.stringify({
+      type: 'connected',
+      data: {
+        state: stateManager.getState(),
+        conversations: stateManager.getConversations(25),
+      },
+      timestamp: new Date().toISOString(),
+    });
+    res.write(`data: ${initialPayload}\n\n`);
+
+    // Keep connection alive with heartbeat
+    const heartbeat = setInterval(() => {
+      res.write(': heartbeat\n\n');
+    }, 20000);
+
+    const unsubscribe = stateManager.subscribeSSE((dataStr: string) => {
+      res.write(`data: ${dataStr}\n\n`);
+    });
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+      res.end();
+    });
+  });
+
+  // Conversations history endpoint
+  app.get('/api/conversations', (req: Request, res: Response) => {
+    const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+    res.json(stateManager.getConversations(limit));
+  });
+
   // Analytics Endpoints
   app.get('/api/analytics', (_req: Request, res: Response) => {
     res.json(stateManager.getState().analytics);

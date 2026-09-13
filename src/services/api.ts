@@ -1,4 +1,5 @@
 import { Task, InventoryItem, ShoppingItem, Bill, MaintenanceTask, HomeState, AnalyticsData } from '../../server/types';
+import { ConversationMessage } from '../types';
 
 export interface AgentChatResponse {
   response: string;
@@ -290,6 +291,13 @@ export const api = {
 
   connectCaspianTelegram: async (): Promise<{ ok: boolean; status: TelegramLiveStatus }> => {
     const res = await fetch('/api/caspian/connect-telegram', { method: 'POST' });
+    return res.json();
+  },
+
+  // Conversation Event Store
+  getConversations: async (limit: number = 50): Promise<ConversationMessage[]> => {
+    const res = await fetch(`/api/conversations?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch conversations');
     return res.json();
   },
 };

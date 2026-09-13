@@ -67,6 +67,28 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
           setChannels(c.channels);
         }
       }).catch(console.error);
+
+      // Hydrate chat log from shared conversation store
+      api.getConversations(15).then((convs) => {
+        if (convs && convs.length > 0) {
+          const formatted = convs.reverse().flatMap((c) => [
+            {
+              sender: 'user' as const,
+              channel: c.channel || 'Telegram',
+              text: c.text,
+              time: c.time || 'Today',
+            },
+            ...(c.response ? [{
+              sender: 'bot' as const,
+              channel: c.channel || 'Telegram',
+              text: c.response,
+              time: c.time || 'Today',
+              toolUsed: c.agentToolsExecuted?.join(', ') || (c.impact?.summary) || undefined,
+            }] : []),
+          ]);
+          setChatLog(formatted);
+        }
+      }).catch(console.error);
     }
   }, [isOpen]);
 

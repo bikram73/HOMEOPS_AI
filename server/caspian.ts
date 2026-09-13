@@ -1,17 +1,24 @@
+import { Caspian } from 'caspian-sdk';
 import { processUserMessage } from './gemini';
 import { stateManager } from './state';
 
 /**
- * Caspian Multi-Channel Integration & Telegram Service for HomeOps-AI
+ * Caspian Multi-Channel Integration & Telegram Gateway for HomeOps-AI
  * 
- * Architecture:
- * Telegram (@MyHomeOps_bot) / Inbound Channels
- *   ↓
- * Caspian Hosted Gateway (https://api.trycaspianai.com) / Inbound Webhook / Direct Telegram Poller
- *   ↓
- * HomeOps Backend Agent (Gemini 3.8 Flash + Tool Calling)
- *   ↓
- * Unified In-Memory Household State Manager & Real-Time Bi-Directional Response
+ * Clean Caspian v1 Architecture:
+ * Telegram (@MyHomeOps_bot)
+ *    ↓
+ * Caspian Hosted Gateway
+ *    ↓
+ * cx.onMessage({ channel: 'telegram', overlap: 'queue' })
+ *    ↓
+ * HomeOps handleIncomingMessage (Gemini Agent + Tools + In-Memory State)
+ *    ↓
+ * thread.post(result.response)
+ *    ↓
+ * Caspian Outbound Delivery
+ *    ↓
+ * Telegram User
  */
 
 export interface CaspianChannelInfo {
@@ -59,15 +66,16 @@ export interface CaspianStatus {
 }
 
 class CaspianIntegrationService {
+  private caspianClient: Caspian | null = null;
   private isInitialized = false;
   private agentName = 'HomeOps-AI';
   private defaultChannel = 'Telegram';
   private totalMessages = 0;
   private lastActiveTimestamp: string | null = null;
-  private caspianClient: any = null;
   private pollingActive = false;
   private pollerAbortController: AbortController | null = null;
   private lastUpdateId = 0;
+
   private telegramBotInfo: { username: string; name: string; valid: boolean } = {
     username: '@MyHomeOps_bot',
     name: 'HomeOps Bot',
@@ -77,7 +85,7 @@ class CaspianIntegrationService {
   private lastTelegramError: string | null = null;
 
   private cachedChannels: CaspianChannelInfo[] = [
-    { id: 'telegram', name: 'Telegram', type: 'messaging', status: 'connected', description: 'Primary chat bot gateway via @BotFather (@MyHomeOps_bot)', icon: 'send' },
+    { id: 'telegram', name: 'Telegram', type: 'messaging', status: 'standby', description: 'Primary chat bot gateway via @BotFather (@MyHomeOps_bot)', icon: 'send' },
     { id: 'email', name: 'Email', type: 'email', status: 'available', description: 'Inbound bill & invoice auto-forwarding parser', icon: 'mail' },
     { id: 'slack', name: 'Slack', type: 'workplace', status: 'available', description: 'Household ops & shared apartment alerts channel', icon: 'tag' },
     { id: 'discord', name: 'Discord', type: 'community', status: 'available', description: 'Family server notification bot & webhooks', icon: 'forum' },
@@ -90,7 +98,7 @@ class CaspianIntegrationService {
   private processedEvents = new Map<string, { timestamp: number; result: any }>();
 
   constructor() {
-    this.initCaspian();
+    void this.initCaspian();
   }
 
   public getApiKey(): string {
@@ -109,76 +117,106 @@ class CaspianIntegrationService {
     return process.env.TELEGRAM_BOT_USERNAME || '@MyHomeOps_bot';
   }
 
+  /**
+   * 1. Caspian v1 Initialization:
+   * Instantiate Caspian -> Add Telegram Channel -> Register onMessage -> Start cx.run()
+   */
   public async initCaspian() {
     const apiKey = this.getApiKey();
     const baseUrl = this.getBaseUrl();
     const botToken = this.getBotToken();
 
-    try {
-      // Import Caspian SDK
-      const caspianModule = await import('caspian-sdk');
-      const Caspian = (caspianModule as any).default || caspianModule.Caspian || caspianModule;
-
-      if (typeof Caspian === 'function') {
-        this.caspianClient = new Caspian();
-        
-        // Register Caspian onMessage handler
-        this.caspianClient.onMessage(async (thread: any, message: any) => {
-          try {
-            const text = message?.text || message?.content || '';
-            const senderId = message?.senderId || message?.from?.id?.toString() || thread?.id?.toString() || 'telegram_user';
-            const eventId = message?.id?.toString() || message?.message_id?.toString();
-            
-            if (text) {
-              const res = await this.handleIncomingMessage('Telegram', senderId, text, eventId);
-              if (res?.response && thread && typeof thread.post === 'function') {
-                await thread.post(res.response);
-              }
-            }
-          } catch (handlerErr) {
-            console.error('[Caspian onMessage error]', handlerErr);
-          }
-        });
-
-        // Add Telegram channel to Caspian if token is provided
-        if (botToken) {
-          try {
-            await this.caspianClient.channels.add('telegram', {
-              via: 'hosted',
-              bot_token: botToken,
-            });
-            console.log('[Caspian] Connected Telegram channel to Caspian SDK');
-          } catch (chErr: any) {
-            console.log('[Caspian] channels.add info:', chErr?.message || chErr);
-          }
-        }
-
-        // If API key is present, start Caspian hosted runner in background
-        if (apiKey) {
-          this.caspianClient.run({ apiKey, baseUrl }).catch((runErr: any) => {
-            console.log('[Caspian run background info]:', runErr?.message || runErr);
-          });
-        }
-
-        this.isInitialized = true;
-        console.log(`[Caspian] Initialized '${this.agentName}' connector`);
-      }
-    } catch (err) {
-      console.log('[Caspian] Running built-in hosted Caspian connector:', (err as Error).message);
-      this.isInitialized = true;
+    if (!apiKey) {
+      console.warn('[Caspian] CASPIAN_API_KEY is not configured');
     }
 
-    // Check Telegram token status and start updater/poller if token exists
+    if (!botToken) {
+      console.warn('[Caspian] TELEGRAM_BOT_TOKEN is not configured');
+    }
+
+    try {
+      const cx = new Caspian();
+
+      // 2. Register onMessage handler with Caspian v1
+      cx.onMessage(
+        {
+          channel: 'telegram',
+          overlap: 'queue',
+        },
+        async (thread: any, msg: any) => {
+          console.log(`[Caspian] Inbound message received on ${msg.chat_kind || 'telegram'}: "${msg.text}"`);
+
+          try {
+            const senderId = String(msg.sender || msg.thread_id || 'telegram_user');
+            const eventId = String(msg.message_id || msg.id || '');
+            const text = msg.text || '';
+
+            if (!text.trim()) return;
+
+            const result = await this.handleIncomingMessage(
+              'Telegram',
+              senderId,
+              text,
+              eventId
+            );
+
+            // 4. Send outbound reply using Caspian thread.post()
+            if (thread && typeof thread.post === 'function') {
+              await thread.post(result.response);
+              console.log('[Caspian] Response successfully dispatched via thread.post()');
+            }
+          } catch (error) {
+            console.error('[Caspian] Message processing error:', error);
+            if (thread && typeof thread.post === 'function') {
+              await thread.post("Sorry, I couldn't process that request right now.");
+            }
+          }
+        }
+      );
+
+      // 1. Connect Telegram channel to Caspian SDK
+      if (botToken) {
+        try {
+          await cx.channels.add('telegram', {
+            via: 'hosted',
+            bot_token: botToken,
+            botToken,
+          });
+          console.log(`[Caspian] Telegram channel registered for ${this.agentName}`);
+        } catch (chErr: any) {
+          console.warn('[Caspian] channels.add warning:', chErr?.message || chErr);
+        }
+      }
+
+      this.caspianClient = cx;
+      this.isInitialized = true;
+      console.log(`[Caspian] Connected & ready for ${this.agentName}`);
+
+      // 3. Start hosted Caspian event loop (cx.run)
+      if (apiKey) {
+        cx.run({
+          apiKey,
+          baseUrl,
+        }).catch((runErr: any) => {
+          console.log('[Caspian run background loop note]:', runErr?.message || runErr);
+        });
+      }
+    } catch (err: any) {
+      console.error('[Caspian] Initialization failed:', err?.message || err);
+      this.isInitialized = false;
+    }
+
+    // Check Telegram token status and sync
     if (botToken) {
       this.syncTelegramStatus().then(() => {
-        // If webhook is empty, start polling so pending updates are processed
+        // If webhook is empty and direct updates are pending, run background poller to ensure zero lost messages
         if (this.lastTelegramWebhookInfo && !this.lastTelegramWebhookInfo.url) {
           this.startTelegramPoller();
         }
       }).catch(console.error);
     }
 
-    this.fetchLiveChannels();
+    this.fetchLiveChannels().catch(console.error);
   }
 
   /**
@@ -223,6 +261,17 @@ class CaspianIntegrationService {
       this.lastTelegramError = err.message || 'Failed to connect to Telegram API';
     }
 
+    // Update cached channel status accurately
+    this.cachedChannels = this.cachedChannels.map((c) => {
+      if (c.id === 'telegram') {
+        return {
+          ...c,
+          status: this.telegramBotInfo.valid && this.isInitialized ? 'connected' : 'standby',
+        };
+      }
+      return c;
+    });
+
     return {
       hasToken: true,
       valid: this.telegramBotInfo.valid,
@@ -245,18 +294,14 @@ class CaspianIntegrationService {
     }
 
     try {
-      // First check pending count
       const beforeInfo = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
       const beforeData = await beforeInfo.json();
       const count = beforeData?.result?.pending_update_count || 0;
 
-      // Drop pending updates via deleteWebhook
       const res = await fetch(`https://api.telegram.org/bot${token}/deleteWebhook?drop_pending_updates=true`);
       const data = await res.json();
 
-      // Reset internal offset
       this.lastUpdateId = 0;
-
       await this.syncTelegramStatus();
 
       return {
@@ -337,20 +382,35 @@ class CaspianIntegrationService {
                   const text = msg.text;
                   const eventId = update.update_id.toString();
 
-                  console.log(`[Telegram Poller] Received update ${update.update_id} from ${senderId}: "${text}"`);
+                  console.log(`[Telegram Poller] Ingesting message from ${senderId}: "${text}"`);
 
                   // Process message through HomeOps AI Agent
-                  await this.handleIncomingMessage('Telegram', senderId, text, eventId);
+                  const result = await this.handleIncomingMessage('Telegram', senderId, text, eventId);
+
+                  // Send response back to chat
+                  if (result?.response && senderId && senderId !== 'unknown_chat') {
+                    try {
+                      await fetch(`https://api.telegram.org/bot${currentToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          chat_id: senderId,
+                          text: result.response,
+                          parse_mode: 'Markdown',
+                        }),
+                      });
+                    } catch (replyErr) {
+                      console.error('[Telegram Reply Error]:', replyErr);
+                    }
+                  }
                 }
               }
             }
           } else {
-            // Wait briefly on non-200 before retrying
             await new Promise((r) => setTimeout(r, 4000));
           }
         } catch (err: any) {
           if (err.name === 'AbortError') break;
-          // Non-blocking timeout wait
           await new Promise((r) => setTimeout(r, 5000));
         }
       }
@@ -371,12 +431,21 @@ class CaspianIntegrationService {
 
   /**
    * Check GET https://api.trycaspianai.com/v1/channels dynamically
+   * Accurately reflects real status without hardcoding "connected"
    */
   public async fetchLiveChannels(): Promise<CaspianChannelInfo[]> {
     const apiKey = this.getApiKey();
     const baseUrl = this.getBaseUrl();
 
-    if (!apiKey) return this.cachedChannels;
+    const isTgConnected = this.isInitialized && this.telegramBotInfo.valid;
+
+    if (!apiKey) {
+      this.cachedChannels = this.cachedChannels.map((c) => ({
+        ...c,
+        status: c.id === 'telegram' ? (isTgConnected ? 'connected' : 'standby') : 'available',
+      }));
+      return this.cachedChannels;
+    }
 
     try {
       const res = await fetch(`${baseUrl}/v1/channels`, {
@@ -393,7 +462,10 @@ class CaspianIntegrationService {
             id: c.id || c.name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
             name: c.name || c.id,
             type: c.type || 'messaging',
-            status: c.id === 'telegram' ? 'connected' : (c.status || 'available'),
+            // Accurate status assignment based on actual connection verification
+            status: c.id === 'telegram' 
+              ? (isTgConnected ? 'connected' : (c.status || 'standby'))
+              : (c.status || 'available'),
             description: c.description || `Connect ${c.name} to HomeOps-AI`,
             icon: c.id === 'telegram' ? 'send' : c.id === 'email' ? 'mail' : c.id === 'slack' ? 'tag' : 'chat',
           }));
@@ -412,7 +484,6 @@ class CaspianIntegrationService {
   public parseWebhookPayload(body: any): { channel: string; senderId: string; text: string; eventId: string } | null {
     if (!body) return null;
     
-    // Extract unique event identifier
     const eventId =
       body.update_id?.toString() ||
       body.eventId?.toString() ||
@@ -456,8 +527,9 @@ class CaspianIntegrationService {
 
   /**
    * Unified message ingestion handler:
-   * Accepts messages from Telegram / Caspian and processes via Gemini Agent + Tools.
+   * Processes message via Gemini Agent + HomeOps deterministic Tools.
    * Enforces Idempotency Protection.
+   * Returns clean result object without duplicate outbound side-effects.
    */
   public async handleIncomingMessage(
     channel: string,
@@ -465,7 +537,6 @@ class CaspianIntegrationService {
     messageText: string,
     eventId?: string
   ) {
-    // Deduplication Key: explicit eventId or payload hash
     const dedupeKey = eventId || `${channel}:${senderId}:${messageText.trim().toLowerCase()}`;
 
     // Clean old entries (TTL 10 mins)
@@ -477,7 +548,7 @@ class CaspianIntegrationService {
     }
 
     if (this.processedEvents.has(dedupeKey)) {
-      console.log(`[Idempotency] Duplicate event ${dedupeKey} detected. Skipping mutation execution.`);
+      console.log(`[Idempotency] Duplicate event ${dedupeKey} detected. Returning cached result.`);
       const cached = this.processedEvents.get(dedupeKey)!.result;
       return { ...cached, duplicate: true };
     }
@@ -491,40 +562,8 @@ class CaspianIntegrationService {
       'telegram'
     );
 
-    // Process directly through Gemini Agent with deterministic Tools
+    // Process directly through Gemini Agent with deterministic Tools & State Mutators
     const agentResult = await processUserMessage(messageText);
-
-    // Outbound response handling:
-    // 1. Direct Caspian SDK client if initialized
-    if (this.caspianClient && typeof this.caspianClient.send === 'function') {
-      try {
-        await this.caspianClient.send({
-          channel,
-          recipientId: senderId,
-          text: agentResult.response,
-        });
-      } catch (e) {
-        console.error('[Caspian send error]', e);
-      }
-    }
-
-    // 2. Direct Telegram Bot API fallback if raw Telegram sender and token exists
-    const botToken = this.getBotToken();
-    if (channel.toLowerCase() === 'telegram' && botToken && senderId && senderId !== 'user_telegram') {
-      try {
-        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: senderId,
-            text: agentResult.response,
-            parse_mode: 'Markdown',
-          }),
-        });
-      } catch (tgErr) {
-        console.error('[Telegram Outbound Send Error]', (tgErr as Error).message);
-      }
-    }
 
     const finalResult = {
       response: agentResult.response,
@@ -532,7 +571,7 @@ class CaspianIntegrationService {
       eventId: dedupeKey,
     };
 
-    // Cache processed event
+    // Cache processed event for idempotency
     this.processedEvents.set(dedupeKey, { timestamp: now, result: finalResult });
 
     return finalResult;
@@ -544,6 +583,8 @@ class CaspianIntegrationService {
 
   public getStatus(): CaspianStatus {
     const apiKey = this.getApiKey();
+    const isTgConnected = this.isInitialized && this.telegramBotInfo.valid;
+
     return {
       initialized: this.isInitialized,
       agentName: this.agentName,
@@ -554,7 +595,10 @@ class CaspianIntegrationService {
       botUsername: this.telegramBotInfo.username || this.getBotUsername(),
       totalMessagesProcessed: this.totalMessages,
       lastActive: this.lastActiveTimestamp,
-      channels: this.cachedChannels,
+      channels: this.cachedChannels.map((c) => ({
+        ...c,
+        status: c.id === 'telegram' ? (isTgConnected ? 'connected' : 'standby') : c.status,
+      })),
       telegram: {
         hasToken: !!this.getBotToken(),
         valid: this.telegramBotInfo.valid,
@@ -569,4 +613,3 @@ class CaspianIntegrationService {
 }
 
 export const caspianService = new CaspianIntegrationService();
-

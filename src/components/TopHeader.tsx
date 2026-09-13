@@ -133,17 +133,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right Actions */}
       <div className="flex items-center gap-3 md:gap-4">
-        {/* Feature Overview Trigger */}
-        <button
-          id="btn-goto-landing"
-          onClick={() => setActiveTab('landing')}
-          className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#0F766E] bg-teal-50 hover:bg-teal-100 border border-teal-200 transition-colors"
-          title="Product Overview & Features"
-        >
-          <span className="material-symbols-outlined text-[16px]">explore</span>
-          <span>Overview</span>
-        </button>
-
         {/* Notifications Icon Button */}
         <button
           id="btn-notifications"

@@ -217,7 +217,7 @@ export function createExpressApp(): Express {
     res.json(plan);
   });
 
-  // Caspian Webhook & Simulator Endpoints
+  // Caspian & Telegram Webhook & Integration Endpoints
   app.get('/api/caspian/status', (_req: Request, res: Response) => {
     res.json(caspianService.getStatus());
   });
@@ -227,7 +227,41 @@ export function createExpressApp(): Express {
     res.json({ channels });
   });
 
-  // Webhook endpoint for live Caspian hosted bot updates
+  app.post('/api/caspian/connect-telegram', async (_req: Request, res: Response) => {
+    try {
+      await caspianService.initCaspian();
+      const status = await caspianService.syncTelegramStatus();
+      res.json({ ok: true, status });
+    } catch (err: any) {
+      res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // Telegram Direct Integration Endpoints
+  app.get('/api/telegram/status', async (_req: Request, res: Response) => {
+    const status = await caspianService.syncTelegramStatus();
+    res.json(status);
+  });
+
+  app.post('/api/telegram/clear-updates', async (_req: Request, res: Response) => {
+    const result = await caspianService.clearPendingUpdates();
+    res.json(result);
+  });
+
+  app.post('/api/telegram/set-webhook', async (req: Request, res: Response) => {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'Webhook url is required' });
+    const result = await caspianService.setWebhook(url);
+    res.json(result);
+  });
+
+  app.post('/api/telegram/delete-webhook', async (req: Request, res: Response) => {
+    const { dropPending } = req.body || {};
+    const result = await caspianService.deleteWebhook(!!dropPending);
+    res.json(result);
+  });
+
+  // Webhook endpoint for live Caspian hosted bot updates / Telegram raw webhooks
   app.post('/api/caspian/webhook', async (req: Request, res: Response) => {
     try {
       const parsed = caspianService.parseWebhookPayload(req.body);

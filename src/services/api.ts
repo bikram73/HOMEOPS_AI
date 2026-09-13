@@ -28,6 +28,27 @@ export interface CaspianChannel {
   icon: string;
 }
 
+export interface TelegramWebhookInfo {
+  url: string;
+  has_custom_certificate?: boolean;
+  pending_update_count?: number;
+  last_error_date?: number;
+  last_error_message?: string;
+  max_connections?: number;
+  ip_address?: string;
+}
+
+export interface TelegramLiveStatus {
+  hasToken: boolean;
+  valid: boolean;
+  botUsername: string;
+  botName: string;
+  webhookInfo: TelegramWebhookInfo | null;
+  pollingActive: boolean;
+  lastActiveTimestamp?: string;
+  lastError?: string;
+}
+
 export interface CaspianStatusResponse {
   initialized: boolean;
   agentName: string;
@@ -39,6 +60,7 @@ export interface CaspianStatusResponse {
   totalMessagesProcessed: number;
   lastActive: string | null;
   channels?: CaspianChannel[];
+  telegram?: TelegramLiveStatus;
 }
 
 export const api = {
@@ -255,6 +277,40 @@ export const api = {
 
   getAnalytics: async (): Promise<AnalyticsData> => {
     const res = await fetch('/api/analytics');
+    return res.json();
+  },
+
+  // Telegram Direct API controls
+  getTelegramStatus: async (): Promise<TelegramLiveStatus> => {
+    const res = await fetch('/api/telegram/status');
+    return res.json();
+  },
+
+  clearTelegramUpdates: async (): Promise<{ ok: boolean; message: string; pendingCleared?: number }> => {
+    const res = await fetch('/api/telegram/clear-updates', { method: 'POST' });
+    return res.json();
+  },
+
+  setTelegramWebhook: async (url: string): Promise<{ ok: boolean; message: string }> => {
+    const res = await fetch('/api/telegram/set-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    return res.json();
+  },
+
+  deleteTelegramWebhook: async (dropPending: boolean = false): Promise<{ ok: boolean; message: string }> => {
+    const res = await fetch('/api/telegram/delete-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dropPending }),
+    });
+    return res.json();
+  },
+
+  connectCaspianTelegram: async (): Promise<{ ok: boolean; status: TelegramLiveStatus }> => {
+    const res = await fetch('/api/caspian/connect-telegram', { method: 'POST' });
     return res.json();
   },
 };

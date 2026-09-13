@@ -43,6 +43,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
   const [statusIndex, setStatusIndex] = useState(0);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
   const [activeChannelTab, setActiveChannelTab] = useState<'telegram' | 'web' | 'automation'>('telegram');
+  const [footerModal, setFooterModal] = useState<'privacy' | 'terms' | 'contact' | 'careers' | null>(null);
+  const [contactSubmitted, setContactSubmitted] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: '', email: '', message: '' });
 
   const rotatingPhrases = [
     'restock pantry essentials',
@@ -1107,33 +1110,273 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({ onLaunchApp })
             </p>
           </div>
           <div className="flex flex-wrap gap-6 md:justify-end items-center">
-            <a
-              className="text-[12px] font-semibold text-[#45464d] hover:text-[#000000] transition-colors"
-              href="#"
+            <button
+              onClick={() => setFooterModal('privacy')}
+              className="text-[12px] font-semibold text-[#45464d] hover:text-[#006a63] transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Privacy Policy
-            </a>
-            <a
-              className="text-[12px] font-semibold text-[#45464d] hover:text-[#000000] transition-colors"
-              href="#"
+            </button>
+            <button
+              onClick={() => setFooterModal('terms')}
+              className="text-[12px] font-semibold text-[#45464d] hover:text-[#006a63] transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Terms of Service
-            </a>
-            <a
-              className="text-[12px] font-semibold text-[#45464d] hover:text-[#000000] transition-colors"
-              href="#"
+            </button>
+            <button
+              onClick={() => {
+                setContactSubmitted(false);
+                setFooterModal('contact');
+              }}
+              className="text-[12px] font-semibold text-[#45464d] hover:text-[#006a63] transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Contact
-            </a>
-            <a
-              className="text-[12px] font-semibold text-[#45464d] hover:text-[#000000] transition-colors"
-              href="#"
+            </button>
+            <button
+              onClick={() => setFooterModal('careers')}
+              className="text-[12px] font-semibold text-[#45464d] hover:text-[#006a63] transition-colors cursor-pointer bg-transparent border-0 p-0"
             >
               Careers
-            </a>
+            </button>
           </div>
         </div>
       </footer>
+
+      {/* Footer Interactive Information Modals */}
+      <AnimatePresence>
+        {footerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-gray-200 shadow-2xl p-6 sm:p-8 relative"
+            >
+              <button
+                onClick={() => setFooterModal(null)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 hover:text-black transition-colors"
+                aria-label="Close dialog"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {footerModal === 'privacy' && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-[#006a63]">
+                      <Shield className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Privacy Policy</h3>
+                      <p className="text-xs text-gray-500">Effective Date: September 2026</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-sm text-[#45464d] leading-relaxed">
+                    <p>
+                      At <strong>HomeOps AI</strong>, protecting your household data and privacy is built into our foundational architecture. We strictly adhere to zero-compromise data isolation policies.
+                    </p>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2 text-xs">
+                      <div className="font-semibold text-slate-800">Key Commitments:</div>
+                      <div>• <strong>No Data Selling:</strong> We do not sell, rent, or monetize your pantry habits, grocery receipts, or utility payment records.</div>
+                      <div>• <strong>Server-Side Secret Isolation:</strong> All Gemini API keys, Telegram Bot tokens, and credentials are kept strictly in secured backend memory.</div>
+                      <div>• <strong>Local First &amp; Transparent Logs:</strong> Every task mutation and automated restock is permanently recorded in your transparent Activity Calendar.</div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Have questions regarding your data rights or wish to request complete deletion? Contact us anytime at privacy@homeops.ai.
+                    </p>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => setFooterModal(null)}
+                        className="bg-[#006a63] hover:bg-[#00504a] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all"
+                      >
+                        Understood
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {footerModal === 'terms' && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-[#006a63]">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Terms of Service</h3>
+                      <p className="text-xs text-gray-500">Last updated: September 2026</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-sm text-[#45464d] leading-relaxed">
+                    <p>
+                      By accessing or using the <strong>HomeOps AI</strong> platform, Telegram bot agent, and automated household services, you agree to the following terms:
+                    </p>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2.5 text-xs">
+                      <div>
+                        <strong className="text-slate-800">1. Responsible Household Automation:</strong>
+                        <p className="text-slate-600 mt-0.5">Automations such as automatic restock additions are designed as aids. You retain ultimate approval for financial transactions and service contracts.</p>
+                      </div>
+                      <div>
+                        <strong className="text-slate-800">2. Security &amp; Channel Access:</strong>
+                        <p className="text-slate-600 mt-0.5">Only authorize members of your household to connect to your shared HomeOps bot channel to maintain operational integrity.</p>
+                      </div>
+                      <div>
+                        <strong className="text-slate-800">3. Service Availability:</strong>
+                        <p className="text-slate-600 mt-0.5">HomeOps includes deterministic local fallbacks to ensure uninterrupted chore and inventory management even during upstream network disruptions.</p>
+                      </div>
+                    </div>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => setFooterModal(null)}
+                        className="bg-[#006a63] hover:bg-[#00504a] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all"
+                      >
+                        I Agree
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {footerModal === 'contact' && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-[#006a63]">
+                      <Send className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Get in Touch</h3>
+                      <p className="text-xs text-gray-500">We'd love to hear from you or your household team</p>
+                    </div>
+                  </div>
+
+                  {contactSubmitted ? (
+                    <div className="py-8 text-center space-y-3">
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
+                        <CheckCircle2 className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-lg font-bold text-gray-900">Message Received!</h4>
+                      <p className="text-sm text-[#45464d] max-w-sm mx-auto">
+                        Thank you for reaching out. The HomeOps engineering team will get back to your household at <strong>{contactForm.email || 'your email'}</strong> within 24 hours.
+                      </p>
+                      <button
+                        onClick={() => setFooterModal(null)}
+                        className="mt-4 bg-[#006a63] text-white px-5 py-2 rounded-lg text-xs font-bold hover:bg-[#00504a] transition-all"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  ) : (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (contactForm.email.trim()) {
+                          setContactSubmitted(true);
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Your Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={contactForm.name}
+                          onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                          placeholder="e.g. Alex Henderson"
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#006a63]/40 focus:border-[#006a63]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Email Address</label>
+                        <input
+                          type="email"
+                          required
+                          value={contactForm.email}
+                          onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                          placeholder="alex@example.com"
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#006a63]/40 focus:border-[#006a63]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Message or Feedback</label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={contactForm.message}
+                          onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                          placeholder="Tell us what you need, questions about Caspian integrations, or feature ideas..."
+                          className="w-full px-3.5 py-2.5 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-[#006a63]/40 focus:border-[#006a63]"
+                        />
+                      </div>
+                      <div className="pt-2 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setFooterModal(null)}
+                          className="px-4 py-2 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="bg-[#006a63] hover:bg-[#00504a] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all shadow-xs flex items-center gap-2"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Send Message</span>
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {footerModal === 'careers' && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-[#006a63]">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Careers at HomeOps AI</h3>
+                      <p className="text-xs text-gray-500">Help us revolutionize the future of domestic intelligence</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-sm text-[#45464d] leading-relaxed">
+                    <p>
+                      We are pioneering deterministic AI agents and real-time operational operating systems for households around the globe.
+                    </p>
+                    <div className="space-y-2.5">
+                      <div className="p-3.5 rounded-xl border border-gray-200 hover:border-[#006a63] transition-colors flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-gray-900 text-sm">Full-Stack AI Systems Engineer</div>
+                          <div className="text-xs text-gray-500">TypeScript • Node.js • Gemini API • Remote</div>
+                        </div>
+                        <span className="text-xs font-semibold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded">Open</span>
+                      </div>
+                      <div className="p-3.5 rounded-xl border border-gray-200 hover:border-[#006a63] transition-colors flex items-center justify-between">
+                        <div>
+                          <div className="font-bold text-gray-900 text-sm">Product Designer (Design Systems)</div>
+                          <div className="text-xs text-gray-500">Figma • Tailwind • Mobile UX • Remote</div>
+                        </div>
+                        <span className="text-xs font-semibold text-[#006a63] bg-teal-50 px-2.5 py-1 rounded">Open</span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Interested in joining our mission? Send your GitHub/portfolio to careers@homeops.ai.
+                    </p>
+                    <div className="pt-2 flex justify-end">
+                      <button
+                        onClick={() => setFooterModal(null)}
+                        className="bg-[#006a63] hover:bg-[#00504a] text-white px-5 py-2 rounded-lg text-xs font-bold transition-all"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

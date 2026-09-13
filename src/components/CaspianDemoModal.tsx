@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api, CaspianStatusResponse, CaspianChannel, TelegramLiveStatus } from '../services/api';
-import { Send, Bot, Smartphone, RefreshCw, X, Sparkles, ShieldCheck, ExternalLink, Trash2, CheckCircle, AlertTriangle, Radio } from 'lucide-react';
+import { Send, Bot, Smartphone, RefreshCw, X, Sparkles, ExternalLink, CheckCircle, AlertTriangle, Radio } from 'lucide-react';
 
 interface CaspianDemoModalProps {
   isOpen: boolean;
@@ -19,7 +19,6 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
   const [activeChannel, setActiveChannel] = useState<string>('Telegram');
   const [inputMsg, setInputMsg] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [chatLog, setChatLog] = useState<
@@ -72,20 +71,6 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
-
-  const handleClearPending = async () => {
-    setIsClearing(true);
-    setActionNotice(null);
-    try {
-      const res = await api.clearTelegramUpdates();
-      setActionNotice(res.message || 'Pending updates cleared successfully.');
-      refreshDiagnostics();
-    } catch (err: any) {
-      setActionNotice(`Error: ${err.message}`);
-    } finally {
-      setIsClearing(false);
-    }
-  };
 
   const handleSyncTelegram = async () => {
     setIsSyncing(true);
@@ -169,7 +154,7 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
           </button>
         </div>
 
-        {/* Telegram Direct Connect & Live Webhook Diagnostics Banner */}
+        {/* Caspian 1.0 Hosted Gateway & Telegram Status Banner */}
         <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 space-y-2 text-xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -179,9 +164,17 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
               <span className="font-semibold text-slate-800">
                 Telegram: <strong className="text-[#0088cc]">{tgStatus?.botUsername || status?.botUsername || '@MyHomeOps_bot'}</strong>
               </span>
-              {tgStatus?.valid && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                  <CheckCircle className="w-3 h-3" /> Token Verified
+              {tgStatus?.status === 'connected' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <CheckCircle className="w-3 h-3 text-emerald-600" /> Connected (Active)
+                </span>
+              ) : tgStatus?.status === 'configured' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 border border-sky-300">
+                  <CheckCircle className="w-3 h-3 text-sky-600" /> Configured &amp; Listening
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  <AlertTriangle className="w-3 h-3 text-amber-600" /> Standby
                 </span>
               )}
             </div>
@@ -191,7 +184,7 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
                 onClick={handleSyncTelegram}
                 disabled={isSyncing}
                 className="flex items-center gap-1 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 px-2.5 py-1 rounded-lg font-medium text-[11px] transition-colors"
-                title="Synchronize Caspian channel and verify Telegram connection"
+                title="Synchronize Caspian channel and verify connection"
               >
                 <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin text-teal-600' : ''}`} />
                 <span>Sync Channel</span>
@@ -208,38 +201,31 @@ export const CaspianDemoModal: React.FC<CaspianDemoModalProps> = ({
             </div>
           </div>
 
-          {/* Webhook & Update Consumption State */}
-          <div className="bg-white rounded-lg p-2.5 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-[11px] text-slate-600">
+          {/* Caspian Gateway Runtime Mode */}
+          <div className="bg-white rounded-lg p-2.5 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center gap-2 text-slate-700">
               <Radio className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
               <span>
-                Ingress Mode:{' '}
-                <strong className="text-slate-800">
-                  {webhookUrl ? `Webhook (${webhookUrl})` : 'Active Live Poller (Consuming Updates)'}
+                Caspian Architecture:{' '}
+                <strong className="text-slate-900">
+                  Hosted Gateway (cx.run &bull; onMessage &bull; thread.post)
                 </strong>
               </span>
             </div>
 
-            {pendingCount > 0 ? (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                  <AlertTriangle className="w-3 h-3 text-amber-600" />
-                  {pendingCount} Pending Update{pendingCount > 1 ? 's' : ''}
-                </span>
-                <button
-                  onClick={handleClearPending}
-                  disabled={isClearing}
-                  className="flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-0.5 rounded-md text-[11px] font-bold transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>{isClearing ? 'Clearing...' : 'Clear Stale Updates'}</span>
-                </button>
-              </div>
-            ) : (
-              <span className="text-[11px] font-medium text-emerald-700 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> All updates consumed (Queue Clean)
+            <div className="flex items-center gap-3 text-slate-500">
+              <span>
+                Processed:{' '}
+                <strong className="text-slate-800 font-mono">
+                  {status?.totalMessagesProcessed ?? 0} msgs
+                </strong>
               </span>
-            )}
+              {status?.lastActive && (
+                <span>
+                  Last Active: <strong className="text-slate-800">{status.lastActive}</strong>
+                </span>
+              )}
+            </div>
           </div>
 
           {actionNotice && (

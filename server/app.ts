@@ -237,28 +237,10 @@ export function createExpressApp(): Express {
     }
   });
 
-  // Telegram Direct Integration Endpoints
+  // Telegram & Caspian Hosted Gateway Endpoints
   app.get('/api/telegram/status', async (_req: Request, res: Response) => {
     const status = await caspianService.syncTelegramStatus();
     res.json(status);
-  });
-
-  app.post('/api/telegram/clear-updates', async (_req: Request, res: Response) => {
-    const result = await caspianService.clearPendingUpdates();
-    res.json(result);
-  });
-
-  app.post('/api/telegram/set-webhook', async (req: Request, res: Response) => {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: 'Webhook url is required' });
-    const result = await caspianService.setWebhook(url);
-    res.json(result);
-  });
-
-  app.post('/api/telegram/delete-webhook', async (req: Request, res: Response) => {
-    const { dropPending } = req.body || {};
-    const result = await caspianService.deleteWebhook(!!dropPending);
-    res.json(result);
   });
 
   // Webhook endpoint for live Caspian hosted bot updates / Telegram raw webhooks

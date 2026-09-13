@@ -23,9 +23,10 @@ export interface CaspianChannel {
   id: string;
   name: string;
   type: string;
-  status: 'connected' | 'available' | 'standby';
+  status: 'connected' | 'configured' | 'available' | 'standby';
   description: string;
   icon: string;
+  lastActive?: string | null;
 }
 
 export interface TelegramWebhookInfo {
@@ -43,9 +44,10 @@ export interface TelegramLiveStatus {
   valid: boolean;
   botUsername: string;
   botName: string;
-  webhookInfo: TelegramWebhookInfo | null;
-  pollingActive: boolean;
-  lastActiveTimestamp?: string;
+  mode: 'caspian_hosted';
+  status: 'connected' | 'configured' | 'unconfigured' | 'error';
+  totalMessagesProcessed: number;
+  lastActiveTimestamp?: string | null;
   lastError?: string;
 }
 
@@ -280,32 +282,9 @@ export const api = {
     return res.json();
   },
 
-  // Telegram Direct API controls
+  // Telegram & Caspian Hosted Gateway controls
   getTelegramStatus: async (): Promise<TelegramLiveStatus> => {
     const res = await fetch('/api/telegram/status');
-    return res.json();
-  },
-
-  clearTelegramUpdates: async (): Promise<{ ok: boolean; message: string; pendingCleared?: number }> => {
-    const res = await fetch('/api/telegram/clear-updates', { method: 'POST' });
-    return res.json();
-  },
-
-  setTelegramWebhook: async (url: string): Promise<{ ok: boolean; message: string }> => {
-    const res = await fetch('/api/telegram/set-webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
-    return res.json();
-  },
-
-  deleteTelegramWebhook: async (dropPending: boolean = false): Promise<{ ok: boolean; message: string }> => {
-    const res = await fetch('/api/telegram/delete-webhook', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dropPending }),
-    });
     return res.json();
   },
 

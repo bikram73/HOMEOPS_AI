@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { PageTab, UserProfile } from '../types';
 import { LOGO_URL } from '../data/mockData';
 import { saveProfile, validateProfileInput } from '../utils/profileStore';
-import { User, Home, MapPin, DollarSign, Edit3, Check, X, CheckCircle2 } from 'lucide-react';
+import { User, Home, MapPin, DollarSign, Edit3, Check, X, CheckCircle2, Bot } from 'lucide-react';
 
 interface TopHeaderProps {
   activeTab: PageTab;
@@ -161,14 +161,16 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <button
           id="btn-quick-ai"
           onClick={() => setActiveTab('assistant')}
-          className={`p-2 rounded-full transition-colors ${
+          type="button"
+          aria-label="Open AI Assistant"
+          className={`p-2 rounded-full transition-all cursor-pointer flex items-center justify-center ${
             activeTab === 'assistant'
-              ? 'bg-[#CCFBF1] text-[#0F766E]'
-              : 'text-gray-600 hover:text-[#0F766E] hover:bg-[#f1f5f9]'
+              ? 'bg-[#CCFBF1] text-[#0F766E] ring-2 ring-[#0F766E]/20 shadow-xs'
+              : 'text-gray-600 hover:text-[#0F766E] hover:bg-[#f1f5f9] active:scale-95'
           }`}
           title="HomeOps AI Assistant"
         >
-          <span className="material-symbols-outlined text-[22px]">smart_toy</span>
+          <Bot className="w-5 h-5 pointer-events-none" />
         </button>
 
         {/* User / Household Profile Pill */}

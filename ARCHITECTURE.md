@@ -1,5 +1,33 @@
 # 🏗️ HomeOps AI: Architecture Document
 
+<div align="center">
+
+[![Download Architecture PDF](https://img.shields.io/badge/📄%20Working%20Architecture%20PDF-HomeOps__AI__Working__Architecture.pdf-00C7B7?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](./HomeOps_AI_Working_Architecture.pdf)
+[![Live Application](https://img.shields.io/badge/Netlify-homeops--ai.netlify.app-00C7B7?style=for-the-badge&logo=netlify&logoColor=white)](https://homeops-ai.netlify.app/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-bikram73%2FHOMEOPS__AI-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/bikram73/HOMEOPS_AI)
+
+</div>
+
+---
+
+## 📄 Working Architecture Visual Diagram (PDF)
+
+Below is the official **HomeOps AI Working Architecture Diagram** (`HomeOps_AI_Working_Architecture.pdf`). You can inspect it directly in the embedded viewer below or [download the PDF file directly](./HomeOps_AI_Working_Architecture.pdf).
+
+<div align="center">
+
+<object data="./HomeOps_AI_Working_Architecture.pdf" type="application/pdf" width="100%" height="850px">
+  <iframe src="./HomeOps_AI_Working_Architecture.pdf" width="100%" height="850px" style="border: 1px solid #e2e8f0; border-radius: 8px;">
+    <p>Your browser does not support embedded PDF viewing. Please <a href="./HomeOps_AI_Working_Architecture.pdf" target="_blank" rel="noopener noreferrer"><b>click here to view and download HomeOps_AI_Working_Architecture.pdf</b></a>.</p>
+  </iframe>
+</object>
+
+<p><em>Direct PDF link: <a href="./HomeOps_AI_Working_Architecture.pdf"><b>HomeOps_AI_Working_Architecture.pdf</b></a> (Accessible in workspace root and <code>public/</code> static web directory)</em></p>
+
+</div>
+
+---
+
 ## 1. System Overview
 HomeOps AI is an autonomous household operations platform built on a clean three-tier architecture:
 
@@ -54,3 +82,4 @@ HomeOps AI is an autonomous household operations platform built on a clean three
 - **Frontend**: Single-Page Application (SPA) built via Vite into `/dist`, served with static asset caching and root fallback.
 - **Backend API**: Full-stack Node.js Express server running `server.ts` / `dist/server.cjs` binding to `0.0.0.0:3000`.
 - **Caspian Hosted Gateway**: Long-polling event loop initialized on startup via `caspianService.initCaspian()`, dispatching replies directly via `thread.post()`.
+- **Architecture PDF Asset**: Available in the repository root (`./HomeOps_AI_Working_Architecture.pdf`) and publicly hosted at `/HomeOps_AI_Working_Architecture.pdf`.

@@ -6,6 +6,7 @@
 
 [![GitHub Repository](https://img.shields.io/badge/GitHub-bikram73%2FHOMEOPS__AI-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/bikram73/HOMEOPS_AI)
 [![Live Netlify Deployment](https://img.shields.io/badge/Netlify-homeops--ai.netlify.app-00C7B7?style=for-the-badge&logo=netlify&logoColor=white)](https://homeops-ai.netlify.app/)
+[![Working Architecture PDF](https://img.shields.io/badge/PDF-Architecture%20Diagram-00C7B7?style=for-the-badge&logo=adobeacrobatreader&logoColor=white)](./HomeOps_AI_Working_Architecture.pdf)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.1-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
@@ -38,6 +39,7 @@
 | <div align="center">**View all deliverables required for the AI challenge.** 👉</div> | <div align="center"><a href="#-deliverables"><img src="https://img.shields.io/badge/📄%20Challenge%20Deliverables-059669?style=for-the-badge" /></a></div> |
 | <div align="center">**View the available REST API endpoints and usage examples.** 👉</div> | <div align="center"><a href="#-api-documentation"><img src="https://img.shields.io/badge/🌐%20API%20Documentation-0EA5E9?style=for-the-badge" /></a></div> |
 | <div align="center">**Explore the complete system architecture document.** 👉</div> | <div align="center"><a href="./ARCHITECTURE.md"><img src="https://img.shields.io/badge/🏗️%20Architecture%20Document-DC2626?style=for-the-badge" /></a></div> |
+| <div align="center">**Download and view the official Working Architecture Diagram (PDF).** 👉</div> | <div align="center"><a href="./HomeOps_AI_Working_Architecture.pdf"><img src="https://img.shields.io/badge/📄%20Architecture%20PDF-00C7B7?style=for-the-badge&logo=adobeacrobatreader&logoColor=white" /></a></div> |
 | <div align="center">**Review technical specifications, validation strategy, and metrics.** 👉</div> | <div align="center"><a href="./TECHNICAL_REPORT.md"><img src="https://img.shields.io/badge/📊%20Technical%20Report-2563EB?style=for-the-badge" /></a></div> |
 | <div align="center">**Review performance characteristics and response latency.** 👉</div> | <div align="center"><a href="#-performance"><img src="https://img.shields.io/badge/⚡%20Performance-F59E0B?style=for-the-badge" /></a></div> |
 | <div align="center">**Understand current limitations and known failure cases of the household AI agent.** 👉</div> | <div align="center"><a href="#-known-limitations"><img src="https://img.shields.io/badge/⚠️%20Known%20Limitations-EF4444?style=for-the-badge" /></a></div> |
@@ -365,6 +367,8 @@ npm start
 <a name="architecture"></a>
 ## 🏗️ Architecture
 
+> 📄 **Official Visual Architecture Document**: Download and inspect the full visual blueprint diagram in [**HomeOps_AI_Working_Architecture.pdf**](./HomeOps_AI_Working_Architecture.pdf) or view the embedded preview in [**ARCHITECTURE.md**](./ARCHITECTURE.md).
+
 ```
                                   MULTI-CHANNEL INGRESS
   [Telegram Bot @MyHomeOps_bot]   [Email / Forwarding]   [Slack / Discord / SMS]
@@ -406,6 +410,12 @@ npm start
        [Reactive React 18 UI]                     [Outbound Telegram/Channel]
     (Live SSE /api/events & REST)                 (via Caspian thread.post())
 ```
+
+### 📑 Working Architecture Highlights:
+- **Unified Gateway Ingress**: Telegram messages and channel updates arrive via Caspian's hosted gateway long-poll event listener (`cx.onMessage`), eliminating messy manual webhook tunnel configuration.
+- **Strict Intent & Deterministic Execution Core**: Google Gemini 2.5 Flash and strict regex classifiers safely map natural language utterances into deterministic household tools.
+- **Reactive Dual Output**: Outbound answers post directly to Telegram via `thread.post()` while simultaneously updating the live React 18 frontend dashboard via Server-Sent Events (`/api/events`).
+- **Complete Architecture Documentation**: See [**ARCHITECTURE.md**](./ARCHITECTURE.md) and download [**HomeOps_AI_Working_Architecture.pdf**](./HomeOps_AI_Working_Architecture.pdf) for the full pipeline diagram.
 
 
 
